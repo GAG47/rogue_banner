@@ -35,6 +35,13 @@ static func run(suite: TestSuite) -> void:
 		controller.player_unit_definition,
 		controller.enemy_unit_definition,
 	]
+	for art: ArtDefinition in controller.player_unit_definition.default_arts:
+		debug_definitions.append(art)
+	for art: ArtDefinition in controller.enemy_unit_definition.default_arts:
+		debug_definitions.append(art)
+	debug_definitions.append(
+			load("res://content/buffs/debug_battle_focus.tres") as BuffDefinition
+	)
 	for definition: DefinitionResource in debug_definitions:
 		suite.assert_true(
 				validator.validate(definition).is_valid(),
@@ -66,11 +73,58 @@ static func run(suite: TestSuite) -> void:
 				"Battle debug scene should start on the player turn."
 		)
 		suite.assert_true(
-				controller.phase_label.text.contains("玩家回合"),
+				controller.status_view.phase_label.text.contains("玩家回合"),
 				"Battle debug phase label should use Chinese interface copy."
 		)
 		suite.assert_true(
-				controller.end_turn_button.text == "结束玩家回合",
+				controller.status_view.end_turn_button.text == "结束玩家回合",
 				"Battle debug turn button should use Chinese interface copy."
+		)
+		suite.assert_true(
+				controller.status_view.art_selector != null,
+				"Battle debug scene should expose its Art selector."
+		)
+		suite.assert_true(
+				controller.status_view.use_art_button.text == "使用技艺",
+				"Battle debug Art button should use Chinese interface copy."
+		)
+		controller._handle_coordinate_pressed(Vector2i(1, 1))
+		suite.assert_int_equal(
+				3,
+				controller.status_view.art_selector.item_count,
+				"Selecting a debug player Unit should list its three Arts."
+		)
+		controller._on_art_selected(0)
+		controller._on_use_art_pressed()
+		suite.assert_true(
+				controller._art_range_cells.has(Vector2i(1, 0)),
+				"Starting an Art should expose its geometric range."
+		)
+		suite.assert_true(
+				controller._targetable_cells.has(Vector2i(1, 0)),
+				"Valid empty Cells should be selectable Art aims."
+		)
+		controller._handle_coordinate_pressed(Vector2i(1, 0))
+		suite.assert_int_equal(
+				3,
+				battle.get_unit(
+						controller._selected_unit_id
+				).current_ap,
+				"Empty-cell attacks should execute through the debug interaction."
+		)
+		controller._on_art_selected(1)
+		controller._on_use_art_pressed()
+		suite.assert_true(
+				controller._targetable_cells.has(Vector2i(1, 1)),
+				"Self-targeted Arts should highlight the selected Unit's Cell."
+		)
+		controller._handle_coordinate_pressed(Vector2i(1, 1))
+		var selected_occupant: GridOccupant = battle.grid.get_occupant(
+				Vector2i(1, 1)
+		)
+		suite.assert_int_equal(
+				3,
+				battle.get_unit(selected_occupant.runtime_id).current_shield,
+				"The debug Art interaction should execute through Battle actions."
 		)
 	controller.free()

@@ -52,6 +52,24 @@ implemented set adds:
 - Action validation, execution plans, execution results, and
   `BattleActionService`
 
+## Art and Effect System v3
+
+Implemented v3 contracts are recorded in `docs/art_effect_system.md`. The
+implemented set adds:
+
+- `ModifierDefinition`, `BuffDefinition`, `BuffState`, `AttributeCalculator`,
+  and `BuffService`
+- Battle and installation Condition contexts plus all, any, and not composition
+- `BattleTargetResolver` and line-of-sight validation
+- Effect planning and execution for damage, healing, shield, movement,
+  Apply Buff, and Remove Buff
+- Typed Battle events and deterministic passive trigger processing
+- Completed Use Art action execution
+- `ArtLoadoutService` for installation, removal, and upgrade variants
+- Defeat cleanup and terminal Battle resolution
+
+Types outside the v1, v2, and v3 implemented sets remain planned contracts.
+
 ## Enums
 
 | Type | Responsibility |
@@ -64,8 +82,11 @@ implemented set adds:
 | `TargetRelation` | Self, ally, enemy, neutral, or any |
 | `TargetKind` | Cell, unit, terrain object, or battle |
 | `ModifierOperation` | Flat, additive, multiplicative, override, and clamp |
-| `ModifierDurationKind` | Permanent, battle, turn, round, or counted |
-| `StackingRule` | Independent, refresh, replace, add stacks, or strongest |
+| `BuffStackingRule` | Refresh duration, add stacks, or replace |
+| `EffectTargetSource` | Actor, spatially hit Units, event source, or event target |
+| `HitTargetKind` | Unit, scene object, or either hit category |
+| `BattleEventKind` | Stable typed Battle event categories |
+| `EventUnitRole` | Source or target Unit in a typed Battle event |
 | `RewardKind` | Unit, Art, Relic, Scroll, currency, or service |
 | `MapNodeKind` | Battle, elite, boss, shop, camp, chest, or event |
 | `ActionFailureCode` | Stable machine-readable action rejection categories |
@@ -126,21 +147,23 @@ only through its owning command service.
 | `ConditionResult` | Boolean outcome plus typed failure information |
 | `TargetingDefinition` | Candidate rules, geometry, range, and selection limits |
 | `TargetQuery` | Actor, origin, and typed targeting request |
-| `TargetSelection` | Validated cells, units, or objects selected for an action |
+| `TargetSelection` | Cells, Units, objects, or Battle submitted as the action aim |
+| `ResolvedTargetSet` | Submitted aim, affected Cells, and occupancy-derived hits |
 | `TargetSnapshot` | Resolved targets retained by a locked intent |
 | `EffectDefinition` | Immutable configuration for one generic effect |
 | `EffectContext` | Actor, source, targets, battle access, and execution metadata |
 | `EffectResult` | State changes, events, and explicit failure information |
-| `ModifierDefinition` | Attribute, operation, value, priority, duration, and stacking |
+| `ModifierDefinition` | Attribute, operation, value, and priority |
 | `AttributeQuery` | Base value and contextual modifier sources |
 | `TriggerDefinition` | Event type, condition, limits, and requested effects |
 | `WeightedEntry` | Typed candidate reference and non-negative weight |
 | `RandomSource` | Seeded random operations supplied to random consumers |
 
-Concrete reusable rule types include tag requirements, distance conditions,
-health thresholds, damage effects, healing effects, shielding effects, movement
-effects, forced movement effects, Buff effects, and attribute modifiers. These
-are implemented only when required by the current system phase.
+Implemented reusable rule types include Condition composition, event Unit
+relations, Battle target resolution, damage, healing, shield, movement,
+Apply Buff, Remove Buff, attribute modifiers, relative affected-Cell
+footprints, and explicit hit requirements. Forced movement, directional or
+rotated footprints, and additional factual content Conditions remain planned.
 
 ## Battle Action Types
 
@@ -161,13 +184,11 @@ used to ensure predictable validation finishes before mutation begins.
 
 ## Event Types
 
-`DomainEvent` is the typed base event and contains sequence identity and source
+`BattleEvent` is the typed base event and contains sequence identity and source
 metadata. Event payload subclasses contain only the data required by observers.
 
-Initial event families are:
+Implemented Battle event families are:
 
-- `ActionStartedEvent`
-- `ActionCompletedEvent`
 - `UnitMovedEvent`
 - `DamageAppliedEvent`
 - `HealingAppliedEvent`
@@ -179,7 +200,6 @@ Initial event families are:
 - `TurnStartedEvent`
 - `TurnEndedEvent`
 - `BattleEndedEvent`
-- `RewardGrantedEvent`
 
 Event names describe completed facts. Events do not grant direct mutable access
 to their source state.
@@ -188,11 +208,11 @@ to their source state.
 
 | Type | Responsibility |
 | --- | --- |
-| `ArtInstallRequest` | Unit, Art, and slot selection |
-| `ArtInstallResult` | Installation success or typed requirement failure |
-| `ArtUseQuery` | Read-only validation and preview request |
+| `ArtLoadoutService` | Installation, removal, and upgrade validation for Run Units |
+| `ArtLoadoutResult` | Typed loadout success or requirement failure |
+| `UseArtActionRequest` | Battle actor, installed slot, and submitted target selection |
 | `ArtDefinition.upgraded_variant` | Data-driven upgraded variant |
-| `PassiveSubscription` | Runtime binding from an installed passive Art to typed events |
+| `BattleEventProcessor` | Runtime passive Art and Buff trigger processing |
 
 Installation validation uses slot rules and conditions. Art execution submits a
 Battle action; it does not apply effects directly from UI or a Unit node.

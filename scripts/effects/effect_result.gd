@@ -2,6 +2,8 @@ class_name EffectResult
 extends RefCounted
 
 var status: GameEnums.EffectStatus = GameEnums.EffectStatus.SUCCEEDED
+var events: Array[BattleEvent] = []
+var affected_unit_ids: Array[int] = []
 
 
 static func success() -> EffectResult:

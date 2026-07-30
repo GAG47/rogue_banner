@@ -8,6 +8,7 @@ extends Resource
 @export var minimum_targets: int = 1
 @export var maximum_targets: int = 1
 @export var requires_line_of_sight: bool = true
+@export var affected_offsets: Array[Vector2i] = [Vector2i.ZERO]
 
 
 func validate_configuration(
@@ -38,6 +39,26 @@ func validate_configuration(
 				_child_path(field_path, &"maximum_targets"),
 				"Maximum targets cannot be less than minimum targets."
 		)
+	if affected_offsets.is_empty():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_TARGETING,
+				_child_path(field_path, &"affected_offsets"),
+				"Targeting requires at least one affected Cell offset."
+		)
+	var seen_offsets: Dictionary[Vector2i, bool] = {}
+	for index: int in range(affected_offsets.size()):
+		var offset: Vector2i = affected_offsets[index]
+		if seen_offsets.has(offset):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_TARGETING,
+					StringName(
+							"%s.affected_offsets[%d]"
+							% [String(field_path), index]
+					),
+					"Affected Cell offsets cannot contain duplicates."
+			)
+		else:
+			seen_offsets[offset] = true
 
 
 func _child_path(parent: StringName, child: StringName) -> StringName:

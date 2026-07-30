@@ -8,6 +8,8 @@ var movement_path: Array[Vector2i] = []
 var phase: GameEnums.BattlePhase = GameEnums.BattlePhase.SETUP
 var active_side: GameEnums.BattleSide = GameEnums.BattleSide.PLAYER
 var round_number: int = 0
+var events: Array[BattleEvent] = []
+var removed_unit_ids: Array[int] = []
 
 
 static func success(battle: BattleState) -> ActionExecutionResult:

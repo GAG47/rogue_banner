@@ -377,19 +377,19 @@ static func _test_use_art_entry_is_non_committing(suite: TestSuite) -> void:
 			request
 	)
 	suite.assert_int_equal(
-			GameEnums.ActionFailureCode.ART_EXECUTION_UNAVAILABLE,
+			GameEnums.ActionFailureCode.EFFECT_PLAN_INVALID,
 			result.failure_code,
-			"Use Art must remain unavailable until Effect execution exists."
+			"Unknown Effect definitions must fail during effect planning."
 	)
 	suite.assert_int_equal(
 			original_ap,
 			player_state.current_ap,
-			"Unavailable Art execution must not spend AP."
+			"Failed Effect planning must not spend AP."
 	)
 	suite.assert_int_equal(
 			0,
 			player_state.arts[0].current_cooldown,
-			"Unavailable Art execution must not start cooldown."
+			"Failed Effect planning must not start cooldown."
 	)
 
 

@@ -196,10 +196,13 @@ domain events. It must not directly update UI, rewards, or map state.
 
 ### Modifiers
 
-Modifiers declare a source, target attribute, operation, value, duration, and
-stacking rule. Attribute calculation uses one deterministic order shared by
-units, buffs, arts, relics, and terrain. The exact ordering is finalized before
-the first modifier implementation.
+Modifiers declare a target attribute, operation, value, and priority. Duration
+and stacks belong to the Buff State that supplies the modifier.
+
+Attribute calculation applies flat values, the combined additive percentage,
+multiplicative values, then overrides and clamps. Priority and stable source
+order resolve ordering within each operation group. This is the one calculation
+path used by Unit refresh and scaled effects.
 
 ### Triggers and Events
 
@@ -209,6 +212,10 @@ past-tense names such as `unit_moved`, `damage_applied`, and `turn_ended`.
 Triggers listen through an explicit battle or run event stream and evaluate a
 condition before requesting effects. There is no untyped global string event
 bus. Event processing order is deterministic and covered by tests.
+
+Battle events use a first-in, first-out queue. Living Units are scanned by
+Battle ID, passive Arts by slot, and Buffs by runtime order. Battle State owns
+monotonic event sequence IDs.
 
 ### Random Selection
 

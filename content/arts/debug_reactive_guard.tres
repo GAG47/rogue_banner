@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="ArtDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/art_definition.gd" id="1_art"]
+[ext_resource type="Script" path="res://scripts/rules/trigger_definition.gd" id="2_trigger"]
+[ext_resource type="Script" path="res://scripts/effects/shield_effect_definition.gd" id="3_shield"]
+[ext_resource type="Script" path="res://scripts/rules/event_unit_relation_condition_definition.gd" id="4_condition"]
+
+[sub_resource type="Resource" id="Effect_reactive_shield"]
+script = ExtResource("3_shield")
+target_source = 3
+flat_amount = 1
+source_attribute = 1
+attribute_multiplier = 0.0
+
+[sub_resource type="Resource" id="Condition_owner_target"]
+script = ExtResource("4_condition")
+event_unit_role = 1
+relation = 0
+
+[sub_resource type="Resource" id="Trigger_damage"]
+script = ExtResource("2_trigger")
+event_kind = 1
+maximum_triggers_per_action = 1
+conditions = [SubResource("Condition_owner_target")]
+effects = [SubResource("Effect_reactive_shield")]
+
+[resource]
+script = ExtResource("1_art")
+content_id = &"debug_reactive_guard"
+display_name = "应激防御"
+category = 2
+ap_cost = 0
+cooldown = 0
+passive_triggers = [SubResource("Trigger_damage")]

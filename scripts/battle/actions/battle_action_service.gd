@@ -3,6 +3,13 @@ extends RefCounted
 
 var _pathfinder: GridPathfinder
 var _turn_service: BattleTurnService
+var _target_resolver: BattleTargetResolver
+var _condition_evaluator: ConditionEvaluator
+var _effect_planner: BattleEffectPlanner
+var _effect_executor: BattleEffectExecutor
+var _event_processor: BattleEventProcessor
+var _resolution_service: BattleResolutionService
+var _movement_service: BattleMovementService
 
 
 func _init(
@@ -16,6 +23,27 @@ func _init(
 	_turn_service = turn_service
 	if _turn_service == null:
 		_turn_service = BattleTurnService.new()
+
+	var attribute_calculator: AttributeCalculator = AttributeCalculator.new()
+	var buff_service: BuffService = BuffService.new(attribute_calculator)
+	_movement_service = BattleMovementService.new()
+	_target_resolver = BattleTargetResolver.new()
+	_condition_evaluator = ConditionEvaluator.new()
+	_effect_planner = BattleEffectPlanner.new(
+			attribute_calculator,
+			_pathfinder
+	)
+	_effect_executor = BattleEffectExecutor.new(
+			attribute_calculator,
+			buff_service,
+			_movement_service
+	)
+	_event_processor = BattleEventProcessor.new(
+			_condition_evaluator,
+			_effect_planner,
+			_effect_executor
+	)
+	_resolution_service = BattleResolutionService.new()
 
 
 func validate(
@@ -58,6 +86,12 @@ func execute(
 		)
 	if request is EndTurnActionRequest:
 		return _execute_end_turn(battle, request as EndTurnActionRequest)
+	if request is UseArtActionRequest:
+		return _execute_use_art(
+				battle,
+				request as UseArtActionRequest,
+				validation.plan
+		)
 	return ActionExecutionResult.failure(
 			GameEnums.ActionFailureCode.UNSUPPORTED_ACTION
 	)
@@ -161,23 +195,65 @@ func _validate_use_art(
 		return ActionValidationResult.rejected(
 				GameEnums.ActionFailureCode.INSUFFICIENT_AP
 		)
-	if request.targets == null:
+	var art_definition: ArtDefinition = art_state.definition
+	if request.targets == null or art_definition.targeting == null:
 		return ActionValidationResult.rejected(
 				GameEnums.ActionFailureCode.INVALID_TARGET_SELECTION
 		)
-	var target_count: int = request.targets.count()
-	if (
-			art_state.definition.targeting == null
-			or target_count < art_state.definition.targeting.minimum_targets
-			or target_count > art_state.definition.targeting.maximum_targets
-	):
+	var targeting_context: BattleTargetingContext = BattleTargetingContext.create(
+			battle,
+			actor.instance_id,
+			request.targets
+	)
+	var target_result: TargetResolutionResult = _target_resolver.resolve(
+			art_definition.targeting,
+			targeting_context,
+			request.targets
+	)
+	if not target_result.is_valid:
+		return ActionValidationResult.rejected(target_result.failure_code)
+
+	var condition_context: BattleConditionContext = BattleConditionContext.create(
+			battle,
+			actor.instance_id,
+			target_result.selection,
+			art_definition,
+			target_result.resolved_targets
+	)
+	if not _condition_evaluator.evaluate_all(
+			art_definition.use_conditions,
+			condition_context
+	).passed():
 		return ActionValidationResult.rejected(
-				GameEnums.ActionFailureCode.INVALID_TARGET_SELECTION
+				GameEnums.ActionFailureCode.CONDITION_FAILED
 		)
 
-	return ActionValidationResult.rejected(
-			GameEnums.ActionFailureCode.ART_EXECUTION_UNAVAILABLE
+	var effect_context: EffectContext = EffectContext.create(
+			battle,
+			actor.instance_id,
+			target_result.selection,
+			art_definition,
+			target_result.resolved_targets
 	)
+	var effect_plan_result: EffectPlanResult = _effect_planner.plan_all(
+			art_definition.effects,
+			effect_context
+	)
+	if not effect_plan_result.is_valid or effect_plan_result.plans.is_empty():
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.EFFECT_PLAN_INVALID
+		)
+
+	var plan: ActionExecutionPlan = ActionExecutionPlan.create(
+			request,
+			art_definition.ap_cost
+	)
+	plan.art_slot_index = request.art_slot_index
+	plan.art_definition = art_definition
+	plan.resolved_targets = target_result.resolved_targets
+	plan.cooldown_to_apply = art_definition.cooldown
+	plan.effect_plans.assign(effect_plan_result.plans)
+	return ActionValidationResult.accepted(plan)
 
 
 func _validate_end_turn(
@@ -213,18 +289,21 @@ func _execute_move(
 	):
 		return ActionExecutionResult.failure(GameEnums.ActionFailureCode.STATE_CHANGED)
 
-	var grid_result: GridOperationResult = battle.grid.move_occupant(
-			GridOccupant.unit(request.actor_unit_id),
-			position.value,
-			request.destination
+	var movement: BattleMovementResult = _movement_service.commit_path(
+			battle,
+			request.actor_unit_id,
+			plan.movement_path,
+			plan.ap_cost
 	)
-	if not grid_result.succeeded():
-		return ActionExecutionResult.failure(GameEnums.ActionFailureCode.STATE_CHANGED)
-
-	actor.current_ap -= plan.ap_cost
-	var result: ActionExecutionResult = ActionExecutionResult.success(battle)
-	result.ap_spent = plan.ap_cost
-	result.movement_path.assign(plan.movement_path)
+	if not movement.succeeded:
+		return ActionExecutionResult.failure(movement.failure_code)
+	var result: ActionExecutionResult = _process_events_and_resolve(
+			battle,
+			[movement.event]
+	)
+	if result.is_successful:
+		result.ap_spent = movement.ap_spent
+		result.movement_path.assign(movement.path)
 	return result
 
 
@@ -232,13 +311,92 @@ func _execute_end_turn(
 		battle: BattleState,
 		request: EndTurnActionRequest
 ) -> ActionExecutionResult:
+	var previous_side: GameEnums.BattleSide = battle.active_side
+	var previous_round: int = battle.round_number
 	var transition: TurnTransitionResult = _turn_service.end_turn(
 			battle,
 			request.requesting_side
 	)
 	if not transition.succeeded:
 		return ActionExecutionResult.failure(transition.failure_code)
-	return ActionExecutionResult.success(battle)
+	var events: Array[BattleEvent] = [
+		TurnEndedEvent.create(previous_side, previous_round),
+	]
+	events.append_array(transition.events)
+	events.append(
+			TurnStartedEvent.create(battle.active_side, battle.round_number)
+	)
+	return _process_events_and_resolve(battle, events)
+
+
+func _execute_use_art(
+		battle: BattleState,
+		request: UseArtActionRequest,
+		plan: ActionExecutionPlan
+) -> ActionExecutionResult:
+	var actor: UnitState = battle.get_unit(request.actor_unit_id)
+	if (
+		actor == null
+		or plan == null
+		or plan.art_definition == null
+		or plan.art_slot_index < 0
+		or plan.art_slot_index >= actor.arts.size()
+		or actor.arts[plan.art_slot_index] == null
+		or actor.arts[plan.art_slot_index].definition != plan.art_definition
+		or actor.arts[plan.art_slot_index].current_cooldown > 0
+		or actor.current_ap < plan.ap_cost
+	):
+		return ActionExecutionResult.failure(GameEnums.ActionFailureCode.STATE_CHANGED)
+
+	actor.current_ap -= plan.ap_cost
+	actor.arts[plan.art_slot_index].current_cooldown = plan.cooldown_to_apply
+	var effect_result: EffectResult = _effect_executor.execute_plans(
+			battle,
+			actor.instance_id,
+			plan.effect_plans
+	)
+	if not effect_result.succeeded():
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.EFFECT_EXECUTION_FAILED
+		)
+	effect_result.events.append(
+			ArtUsedEvent.create(
+					actor.instance_id,
+					plan.art_definition,
+					plan.art_slot_index
+			)
+	)
+	var result: ActionExecutionResult = _process_events_and_resolve(
+			battle,
+			effect_result.events
+	)
+	if result.is_successful:
+		result.ap_spent = plan.ap_cost
+	return result
+
+
+func _process_events_and_resolve(
+		battle: BattleState,
+		initial_events: Array[BattleEvent]
+) -> ActionExecutionResult:
+	var event_result: BattleEventProcessResult = _event_processor.process(
+			battle,
+			initial_events
+	)
+	if not event_result.succeeded:
+		var failure: ActionExecutionResult = ActionExecutionResult.failure(
+				event_result.failure_code
+		)
+		failure.events.assign(event_result.events)
+		return failure
+
+	var resolution: BattleResolutionResult = _resolution_service.resolve(battle)
+	var result: ActionExecutionResult = ActionExecutionResult.success(battle)
+	result.events.assign(event_result.events)
+	result.removed_unit_ids.assign(resolution.removed_unit_ids)
+	if resolution.event != null:
+		result.events.append(resolution.event)
+	return result
 
 
 func _validate_actor_action(

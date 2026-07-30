@@ -28,6 +28,8 @@ func validate(definition: DefinitionResource) -> DefinitionValidationResult:
 		_validate_enemy(definition as EnemyDefinition, result)
 	elif definition is TerrainDefinition:
 		_validate_terrain(definition as TerrainDefinition, result)
+	elif definition is BuffDefinition:
+		_validate_buff(definition as BuffDefinition, result)
 	elif definition is TagDefinition:
 		pass
 	else:
@@ -199,7 +201,17 @@ func _validate_art(
 
 	if definition.category == GameEnums.ArtCategory.PASSIVE:
 		if definition.targeting != null:
-			definition.targeting.validate_configuration(result, &"targeting")
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_TARGETING,
+					&"targeting",
+					"Passive Arts cannot declare active targeting."
+			)
+		if not definition.effects.is_empty():
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					&"effects",
+					"Passive Arts cannot declare active effects."
+			)
 	elif definition.targeting == null:
 		result.add_issue(
 				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
@@ -208,6 +220,16 @@ func _validate_art(
 		)
 	else:
 		definition.targeting.validate_configuration(result, &"targeting")
+		_validate_active_art_effect_context(definition, result)
+	if (
+		definition.category != GameEnums.ArtCategory.PASSIVE
+		and not definition.passive_triggers.is_empty()
+	):
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"passive_triggers",
+				"Active Arts cannot declare passive triggers."
+		)
 
 	if definition.upgraded_variant != null:
 		_validate_reference(definition.upgraded_variant, &"upgraded_variant", result)
@@ -262,6 +284,82 @@ func _validate_terrain(
 				"Movement cost must be at least one."
 		)
 	_validate_tags(definition.tags, &"tags", result)
+
+
+func _validate_buff(
+		definition: BuffDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	if definition.duration_turns <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_BUFF,
+				&"duration_turns",
+				"Buff duration must be greater than zero."
+		)
+	if definition.maximum_stacks <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_BUFF,
+				&"maximum_stacks",
+				"Maximum Buff stacks must be greater than zero."
+		)
+	for index: int in range(definition.modifiers.size()):
+		var modifier: ModifierDefinition = definition.modifiers[index]
+		var modifier_path: StringName = _indexed_path(&"modifiers", index)
+		if modifier == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					modifier_path,
+					"Buff modifier references cannot be null."
+			)
+		else:
+			modifier.validate_configuration(result, modifier_path)
+	_validate_triggers(
+			definition.passive_triggers,
+			&"passive_triggers",
+			false,
+			result
+	)
+
+
+func _validate_active_art_effect_context(
+	definition: ArtDefinition,
+	result: DefinitionValidationResult
+) -> void:
+	var move_effect_count: int = 0
+	for index: int in range(definition.effects.size()):
+		var effect: EffectDefinition = definition.effects[index]
+		if effect == null:
+			continue
+		var effect_path: StringName = _indexed_path(&"effects", index)
+		if (
+			effect.target_source
+			== GameEnums.EffectTargetSource.EVENT_SOURCE_UNIT
+			or effect.target_source
+			== GameEnums.EffectTargetSource.EVENT_TARGET_UNIT
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					effect_path,
+					"Active Art effects cannot require a triggering event."
+			)
+		if effect is MoveEffectDefinition:
+			move_effect_count += 1
+			if (
+				definition.targeting.target_kind != GameEnums.TargetKind.CELL
+				or definition.targeting.minimum_targets != 1
+				or definition.targeting.maximum_targets != 1
+			):
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_TARGETING,
+						effect_path,
+						"Move Arts require exactly one selected Cell."
+				)
+	if move_effect_count > 1:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"effects",
+				"An Art cannot contain more than one Move effect."
+		)
 
 
 func _validate_tags(

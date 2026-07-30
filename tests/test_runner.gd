@@ -6,6 +6,8 @@ func _init() -> void:
 	CoreDataLayerTest.run(suite)
 	GridStateTest.run(suite)
 	BattleKernelTest.run(suite)
+	ArtRuleTest.run(suite)
+	ArtEffectSystemTest.run(suite)
 	BattleDebugSceneTest.run(suite)
 
 	if suite.passed():

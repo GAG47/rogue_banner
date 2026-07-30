@@ -4,6 +4,7 @@ extends RefCounted
 var tag: TagDefinition
 var condition: TestConditionDefinition
 var effect: TestEffectDefinition
+var trigger_effect: TestEffectDefinition
 var trigger: TestTriggerDefinition
 var targeting: TargetingDefinition
 var active_art: ArtDefinition
@@ -25,10 +26,12 @@ static func create() -> CoreDataFixture:
 
 	fixture.condition = TestConditionDefinition.new()
 	fixture.effect = TestEffectDefinition.new()
+	fixture.trigger_effect = TestEffectDefinition.new()
+	fixture.trigger_effect.target_source = GameEnums.EffectTargetSource.ACTOR
 
 	fixture.trigger = TestTriggerDefinition.new()
 	fixture.trigger.conditions.append(fixture.condition)
-	fixture.trigger.effects.append(fixture.effect)
+	fixture.trigger.effects.append(fixture.trigger_effect)
 
 	fixture.targeting = TargetingDefinition.new()
 	fixture.targeting.target_kind = GameEnums.TargetKind.UNIT

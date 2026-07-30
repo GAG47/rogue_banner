@@ -19,9 +19,11 @@ static func create(
 		return state
 
 	state.current_health = unit_definition.max_health
-	for art_definition: ArtDefinition in unit_definition.default_arts:
-		if art_definition != null:
-			state.installed_arts.append(art_definition)
+	for slot_index: int in range(unit_definition.slot_count):
+		var art_definition: ArtDefinition
+		if slot_index < unit_definition.default_arts.size():
+			art_definition = unit_definition.default_arts[slot_index]
+		state.installed_arts.append(art_definition)
 	return state
 
 

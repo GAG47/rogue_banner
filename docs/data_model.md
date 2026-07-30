@@ -11,6 +11,11 @@ Battle kernel v2 extends this model with authoritative Grid occupancy,
 Battle-local Unit identity, placement, pathfinding, actions, and turn state. The
 final v2 contracts are detailed in `docs/battle_kernel.md`.
 
+Art and Effect system v3 extends it with modifiers, Buff state, Battle target
+resolution, concrete generic effects, typed Battle events, passive triggers,
+Art loadouts, and terminal Battle resolution. The final v3 contracts are
+detailed in `docs/art_effect_system.md`.
+
 All Definition types are Godot `Resource` classes registered with `class_name`.
 All runtime State types are `RefCounted` classes created uniquely for a Run or
 Battle.
@@ -138,6 +143,30 @@ v1 and belong to the Enemy and Intent phase.
 
 Occupancy and runtime interaction state do not belong to this Resource.
 
+### ModifierDefinition
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `attribute` | `GameEnums.AttributeType` | Maximum health, base attack, or maximum AP |
+| `operation` | `GameEnums.ModifierOperation` | Flat, additive percentage, multiplicative, override, or clamp |
+| `value` | `float` | Finite operation value |
+| `priority` | `int` | Deterministic ordering key |
+
+Duration, source, and stack count do not belong to the modifier Definition.
+
+### BuffDefinition
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `duration_turns` | `int` | Greater than zero |
+| `stacking_rule` | `GameEnums.BuffStackingRule` | Refresh duration, add stacks, or replace |
+| `maximum_stacks` | `int` | At least one |
+| `modifiers` | `Array[ModifierDefinition]` | Non-null validated modifiers |
+| `passive_triggers` | `Array[TriggerDefinition]` | Optional typed Battle triggers |
+
+Current duration, stacks, source Unit, and Battle identity belong to
+`BuffState`.
+
 ## Runtime State
 
 ### ArtState
@@ -153,8 +182,9 @@ Occupancy and runtime interaction state do not belong to this Resource.
 - Optional source Run Unit ID
 - `UnitDefinition` reference
 - `GameEnums.BattleSide`
-- Current health and AP
+- Current health, AP, and shield
 - Unique `ArtState` instances
+- Unique `BuffState` instances
 
 `UnitState.create` initializes current health and AP from the Unit Definition and
 creates fresh Art State for each valid default Art. It never mutates the source
@@ -162,6 +192,12 @@ Definition.
 
 Unit position is not stored in Unit State. It is queried from the authoritative
 Grid occupancy table.
+
+### BuffState
+
+`BuffState` is Battle-owned and contains a Battle-local instance ID, immutable
+`BuffDefinition` reference, source Unit ID, current stacks, and remaining
+duration. Stacks and duration never belong to the shared Buff Definition.
 
 ### RunUnitState
 
@@ -193,6 +229,7 @@ Battle State v2 contains:
 - Round number
 - Battle-owned Unit State indexed by Battle-local ID
 - A monotonic Battle-local Unit ID allocator
+- A monotonic Battle event sequence allocator
 
 Grid State owns all positions and occupancy. Battle State owns Unit identity and
 combat values. Action and turn services mutate these owners only through their
@@ -224,7 +261,12 @@ cannot change the Hero, Unit, Art, or Relic Definitions.
 - Typed `ConditionContext`
 - Typed `ConditionResult` and `ConditionStatus`
 
-No concrete gameplay condition is included in v1.
+Version 3 adds `BattleConditionContext`, `ArtInstallConditionContext`, a
+stateless `ConditionEvaluator`, reusable all, any, and not composition, and an
+event Unit relation Condition for passive ownership filters.
+`HitRequirementConditionDefinition` can explicitly require a minimum number of
+resolved Unit, scene-object, or combined hits. Additional factual Conditions
+are added only when required by reusable content rules.
 
 ### Effects
 
@@ -233,7 +275,12 @@ No concrete gameplay condition is included in v1.
 `EffectContext` and returns a typed `EffectResult`.
 
 This separation prevents authored Effect Resources from owning mutable Battle
-state or searching the scene tree. No concrete Effect is included in v1.
+state or searching the scene tree. Version 3 adds planning and execution for
+damage, healing, shield, movement, Apply Buff, and Remove Buff effects.
+
+Effects resolve the actor, hit Units, or event Units through
+`EffectTargetSource` and publish typed Battle events. Scaled effects combine a
+flat amount with an optional calculated actor attribute.
 
 ### Targeting
 
@@ -243,21 +290,26 @@ state or searching the scene tree. No concrete Effect is included in v1.
 - Minimum and maximum range
 - Minimum and maximum selected targets
 - Line-of-sight requirement
+- Relative affected Cell offsets
 
-`TargetResolver` is an abstract service that receives `TargetingContext` and
-returns a typed `TargetSelection`. Target Selection stores Unit instance IDs,
-cell coordinates, terrain object instance IDs, or a Battle target without
-untyped dictionaries.
+`BattleTargetResolver` receives a Battle context and submitted typed selection.
+It validates target count and kind, duplicates, direct-target relation,
+Manhattan range, and line of sight against authoritative Grid positions.
+`TargetSelection` stores Unit instance IDs, Cell coordinates, terrain object
+instance IDs, or a Battle target without untyped dictionaries.
 
-Geometry, candidate discovery, and line-of-sight execution belong to the Grid
-and Battle phases.
+The resolver then creates a `ResolvedTargetSet` containing the submitted
+selection, aim Cells, expanded affected Cells, matching Unit hits, and matching
+scene-object hits. For spatial Cell targeting, relation filters occupants in
+affected Cells rather than rejecting empty aim Cells. Zero hits are valid unless
+the Art declares a hit requirement Condition.
 
 ### Triggers
 
-`TriggerDefinition` is an abstract Resource that composes Conditions and ordered
-Effects. Concrete typed event bindings and trigger execution are deferred.
-Relics and passive Arts can therefore declare the correct structural dependency
-without introducing string event names or concrete behavior.
+`TriggerDefinition` binds a typed `BattleEventKind` to Conditions, ordered
+Effects, and a per-action activation limit. `BattleEventProcessor` executes
+passive Art and Buff triggers through a deterministic first-in, first-out event
+queue. Relic runtime binding remains deferred.
 
 ## Validation
 
@@ -273,6 +325,7 @@ Definition schema validation. It checks:
 - Unit default Art slot capacity
 - Unit tag compatibility for default Art installation
 - Nested Condition, Effect, Targeting, and Trigger configuration
+- Modifier and Buff configuration
 - Art upgrade cycles and repeated upgrade content IDs
 
 Expected validation failures are returned as
@@ -285,8 +338,8 @@ This validator checks one Definition graph at a time.
 
 ## Test Boundary
 
-Tests use concrete Condition, Effect, and Trigger classes only under
-`tests/fixtures`. They are contract fixtures and are not game content.
+Tests use fixture Conditions only under `tests/fixtures`. Authored debug Arts
+and Buffs use the same generic production definitions and services.
 
 The headless test runner verifies:
 
@@ -299,3 +352,7 @@ The headless test runner verifies:
 - Grid topology, Terrain, occupancy, and pathfinding
 - Run-to-Battle Unit creation and Battle-local ID allocation
 - Movement actions, AP costs, atomic failures, and turn transitions
+- Targeting, line of sight, Conditions, modifiers, and Buff lifecycle
+- Art loadouts, upgrades, AP, cooldowns, and ordered effects
+- Damage, healing, shield, movement, Apply Buff, and Remove Buff
+- Typed passive events, defeat cleanup, victory, and failure

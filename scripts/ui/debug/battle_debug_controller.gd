@@ -23,12 +23,8 @@ const BLOCKED_CELLS: Array[Vector2i] = [
 @export var unit_view: BattleUnitView
 
 @export_category("Interface")
-@export var phase_label: Label
-@export var round_label: Label
-@export var selected_unit_label: Label
+@export var status_view: BattleDebugStatusView
 @export var feedback_label: Label
-@export var end_turn_button: Button
-@export var reset_button: Button
 
 @export_category("Debug Content")
 @export var ground_terrain: TerrainDefinition
@@ -42,8 +38,13 @@ var _placement_service: BattlePlacementService = BattlePlacementService.new()
 var _turn_service: BattleTurnService = BattleTurnService.new()
 var _action_service: BattleActionService
 var _selected_unit_id: int = 0
+var _selected_art_slot_index: int = -1
+var _pending_art_slot_index: int = -1
 var _hovered_coordinate: GridCoordinate
 var _reachable_cells: Dictionary[Vector2i, int] = {}
+var _art_range_cells: Dictionary[Vector2i, bool] = {}
+var _targetable_cells: Dictionary[Vector2i, bool] = {}
+var _art_targeting: BattleDebugArtTargeting = BattleDebugArtTargeting.new()
 
 
 func _init() -> void:
@@ -55,15 +56,25 @@ func _init() -> void:
 
 func _ready() -> void:
 	if (
-		end_turn_button != null
-		and not end_turn_button.pressed.is_connected(_on_end_turn_pressed)
+		status_view != null
+		and not status_view.art_selected.is_connected(_on_art_selected)
 	):
-		end_turn_button.pressed.connect(_on_end_turn_pressed)
+		status_view.art_selected.connect(_on_art_selected)
 	if (
-		reset_button != null
-		and not reset_button.pressed.is_connected(_on_reset_pressed)
+		status_view != null
+		and not status_view.art_use_requested.is_connected(_on_use_art_pressed)
 	):
-		reset_button.pressed.connect(_on_reset_pressed)
+		status_view.art_use_requested.connect(_on_use_art_pressed)
+	if (
+		status_view != null
+		and not status_view.end_turn_requested.is_connected(_on_end_turn_pressed)
+	):
+		status_view.end_turn_requested.connect(_on_end_turn_pressed)
+	if (
+		status_view != null
+		and not status_view.battle_reset_requested.is_connected(_on_reset_pressed)
+	):
+		status_view.battle_reset_requested.connect(_on_reset_pressed)
 	rebuild_debug_battle()
 
 
@@ -92,8 +103,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func rebuild_debug_battle() -> bool:
 	_selected_unit_id = 0
+	_selected_art_slot_index = -1
+	_pending_art_slot_index = -1
 	_hovered_coordinate = null
 	_reachable_cells.clear()
+	_art_range_cells.clear()
+	_targetable_cells.clear()
 
 	if not _has_complete_scene_configuration():
 		_battle = null
@@ -165,7 +180,7 @@ func rebuild_debug_battle() -> bool:
 		return _fail_rebuild("战斗启动失败。")
 
 	_battle = battle
-	_set_feedback("选择蓝色单位，然后点击高亮格子。")
+	_set_feedback("选择蓝色单位后，可以移动或选择技艺。")
 	_refresh_view()
 	debug_battle_rebuilt.emit()
 	return true
@@ -181,6 +196,10 @@ func _handle_coordinate_pressed(coordinate: Vector2i) -> void:
 		or _battle.active_side != GameEnums.BattleSide.PLAYER
 	):
 		_set_feedback("敌方决策尚未实现，请推进回合。")
+		return
+
+	if _pending_art_slot_index >= 0:
+		_execute_pending_art(coordinate)
 		return
 
 	var occupant: GridOccupant = _battle.grid.get_occupant(coordinate)
@@ -208,7 +227,7 @@ func _handle_coordinate_pressed(coordinate: Vector2i) -> void:
 	else:
 		_set_feedback(
 				"无法移动：%s。"
-				% _failure_code_text(result.failure_code)
+				% BattleDebugTextFormatter.failure_code_text(result.failure_code)
 		)
 	_refresh_reachable_cells()
 	_refresh_view()
@@ -216,19 +235,27 @@ func _handle_coordinate_pressed(coordinate: Vector2i) -> void:
 
 func _select_unit(unit_id: int) -> void:
 	_selected_unit_id = unit_id
+	_pending_art_slot_index = -1
+	_art_range_cells.clear()
+	_targetable_cells.clear()
 	var unit: UnitState = _battle.get_unit(unit_id)
 	if unit != null:
 		_set_feedback("已选择%s，单位编号%d。" % [
 			unit.definition.display_name,
 			unit.instance_id,
 		])
+	_populate_art_selector()
 	_refresh_reachable_cells()
 	_refresh_view()
 
 
 func _refresh_reachable_cells() -> void:
 	_reachable_cells.clear()
-	if _battle == null or _selected_unit_id <= 0:
+	if (
+		_battle == null
+		or _selected_unit_id <= 0
+		or _pending_art_slot_index >= 0
+	):
 		return
 
 	for y: int in range(_battle.grid.height):
@@ -275,21 +302,147 @@ func _on_end_turn_pressed() -> void:
 	var result: ActionExecutionResult = _action_service.execute(_battle, request)
 	if result.is_successful:
 		_selected_unit_id = 0
+		_selected_art_slot_index = -1
+		_pending_art_slot_index = -1
 		_reachable_cells.clear()
+		_art_range_cells.clear()
+		_targetable_cells.clear()
+		_populate_art_selector()
 		_set_feedback(
 				"回合已推进至%s。"
-				% _side_text(_battle.active_side)
+				% BattleDebugTextFormatter.side_text(_battle.active_side)
 		)
 	else:
 		_set_feedback(
 				"无法推进回合：%s。"
-				% _failure_code_text(result.failure_code)
+				% BattleDebugTextFormatter.failure_code_text(result.failure_code)
 		)
 	_refresh_view()
 
 
 func _on_reset_pressed() -> void:
 	rebuild_debug_battle()
+
+
+func _on_art_selected(slot_index: int) -> void:
+	_selected_art_slot_index = slot_index
+	_pending_art_slot_index = -1
+	_art_range_cells.clear()
+	_targetable_cells.clear()
+	_refresh_reachable_cells()
+	_refresh_view()
+
+
+func _on_use_art_pressed() -> void:
+	if _pending_art_slot_index >= 0:
+		_pending_art_slot_index = -1
+		_art_range_cells.clear()
+		_targetable_cells.clear()
+		_refresh_reachable_cells()
+		_set_feedback("已取消技艺目标选择。")
+		_refresh_view()
+		return
+	if _battle == null or _selected_unit_id <= 0:
+		_set_feedback("请先选择一个蓝色玩家单位。")
+		return
+	var unit: UnitState = _battle.get_unit(_selected_unit_id)
+	var art_state: ArtState = _get_selected_art_state(unit)
+	if art_state == null or art_state.definition == null:
+		_set_feedback("请选择一个可以使用的技艺。")
+		return
+	var targeting: TargetingDefinition = art_state.definition.targeting
+	if targeting == null:
+		_set_feedback("该技艺缺少目标配置。")
+		return
+	if targeting.minimum_targets != 1 or targeting.maximum_targets != 1:
+		_set_feedback("当前调试界面只支持单目标技艺。")
+		return
+
+	_pending_art_slot_index = _selected_art_slot_index
+	_reachable_cells.clear()
+	_art_range_cells.clear()
+	_targetable_cells.clear()
+	if targeting.target_kind == GameEnums.TargetKind.BATTLE:
+		var battle_selection: TargetSelection = TargetSelection.new()
+		battle_selection.targets_battle = true
+		_execute_art(battle_selection)
+		return
+
+	_refresh_targetable_cells()
+	if _targetable_cells.is_empty():
+		_set_feedback("已显示技艺射程，但当前没有合法落点。")
+	else:
+		_set_feedback("浅紫格子是射程，亮紫格子可以确认攻击。")
+	_refresh_view()
+
+
+func _execute_pending_art(coordinate: Vector2i) -> void:
+	if not _targetable_cells.has(coordinate):
+		_set_feedback("该格子不是当前技艺的合法目标。")
+		return
+	var selection: TargetSelection = _selection_for_coordinate(
+			_pending_art_slot_index,
+			coordinate
+	)
+	if selection == null:
+		_set_feedback("无法从该格子构造目标。")
+		return
+	_execute_art(selection)
+
+
+func _execute_art(selection: TargetSelection) -> void:
+	var request: UseArtActionRequest = UseArtActionRequest.create(
+			GameEnums.BattleSide.PLAYER,
+			_selected_unit_id,
+			_pending_art_slot_index,
+			selection
+	)
+	var result: ActionExecutionResult = _action_service.execute(_battle, request)
+	_pending_art_slot_index = -1
+	_art_range_cells.clear()
+	_targetable_cells.clear()
+	if result.is_successful:
+		_set_feedback(BattleDebugTextFormatter.action_result_text(result))
+		if (
+			_battle.phase == GameEnums.BattlePhase.VICTORY
+			or _battle.phase == GameEnums.BattlePhase.FAILURE
+		):
+			_selected_unit_id = 0
+			_selected_art_slot_index = -1
+	else:
+		_set_feedback(
+				"无法使用技艺：%s。"
+				% BattleDebugTextFormatter.failure_code_text(result.failure_code)
+		)
+	_populate_art_selector()
+	_refresh_reachable_cells()
+	_refresh_view()
+
+
+func _refresh_targetable_cells() -> void:
+	_art_range_cells = _art_targeting.find_range_cells(
+			_battle,
+			_selected_unit_id,
+			_pending_art_slot_index
+	)
+	_targetable_cells = _art_targeting.find_targetable_cells(
+			_battle,
+			_action_service,
+			_selected_unit_id,
+			_pending_art_slot_index
+	)
+
+
+func _selection_for_coordinate(
+		slot_index: int,
+		coordinate: Vector2i
+) -> TargetSelection:
+	return _art_targeting.selection_for_coordinate(
+			_battle,
+			_selected_unit_id,
+			slot_index,
+			coordinate
+	)
 
 
 func _refresh_view() -> void:
@@ -313,64 +466,40 @@ func _refresh_highlights() -> void:
 	highlight_view.present(
 			selected_coordinate,
 			_hovered_coordinate,
-			_reachable_cells
+			_reachable_cells,
+			_art_range_cells,
+			_targetable_cells
 	)
 
 
 func _refresh_status() -> void:
-	if _battle == null:
-		if phase_label != null:
-			phase_label.text = "阶段：不可用"
-		if round_label != null:
-			round_label.text = "轮次：--"
-		if selected_unit_label != null:
-			selected_unit_label.text = "当前单位\n未选择"
-		if end_turn_button != null:
-			end_turn_button.disabled = true
-		return
+	if status_view != null:
+		status_view.present(
+				_battle,
+				_selected_unit_id,
+				_selected_art_slot_index,
+				_pending_art_slot_index
+		)
 
-	if phase_label != null:
-		phase_label.text = "阶段：%s\n当前行动方：%s" % [
-			_phase_text(_battle.phase),
-			_side_text(_battle.active_side),
-		]
-	if round_label != null:
-		round_label.text = "轮次：%d" % _battle.round_number
-	if end_turn_button != null:
-		end_turn_button.disabled = false
-		if _battle.active_side == GameEnums.BattleSide.PLAYER:
-			end_turn_button.text = "结束玩家回合"
-		else:
-			end_turn_button.text = "推进敌方回合"
 
-	if selected_unit_label == null:
+func _populate_art_selector() -> void:
+	var unit: UnitState
+	if _battle != null:
+		unit = _battle.get_unit(_selected_unit_id)
+	if status_view == null:
+		_selected_art_slot_index = -1
 		return
-	var selected_unit: UnitState = _battle.get_unit(_selected_unit_id)
-	if selected_unit == null:
-		selected_unit_label.text = "当前单位\n未选择"
-		return
-	var position: GridCoordinate = _battle.grid.find_occupant(
-			GameEnums.GridOccupantKind.UNIT,
-			selected_unit.instance_id
+	_selected_art_slot_index = status_view.rebuild_art_options(
+			unit,
+			_selected_art_slot_index
 	)
-	var position_text: String = "--"
-	if position != null:
-		position_text = "%d, %d" % [position.value.x, position.value.y]
-	selected_unit_label.text = (
-		"当前单位\n"
-		+ "%s，编号%d\n" % [
-			selected_unit.definition.display_name,
-			selected_unit.instance_id,
-		]
-		+ "生命：%d / %d\n" % [
-			selected_unit.current_health,
-			selected_unit.definition.max_health,
-		]
-		+ "行动点：%d / %d\n" % [
-			selected_unit.current_ap,
-			selected_unit.definition.max_ap,
-		]
-		+ "格子：%s" % position_text
+
+
+func _get_selected_art_state(unit: UnitState) -> ArtState:
+	return _art_targeting.get_art_state(
+			_battle,
+			unit.instance_id if unit != null else 0,
+			_selected_art_slot_index
 	)
 
 
@@ -379,6 +508,7 @@ func _has_complete_scene_configuration() -> bool:
 		grid_view != null
 		and highlight_view != null
 		and unit_view != null
+		and status_view != null
 		and ground_terrain != null
 		and difficult_terrain != null
 		and blocked_terrain != null
@@ -397,75 +527,3 @@ func _fail_rebuild(message: String) -> bool:
 func _set_feedback(message: String) -> void:
 	if feedback_label != null:
 		feedback_label.text = message
-
-
-func _phase_text(phase: GameEnums.BattlePhase) -> String:
-	match phase:
-		GameEnums.BattlePhase.SETUP:
-			return "准备"
-		GameEnums.BattlePhase.PLAYER_TURN:
-			return "玩家回合"
-		GameEnums.BattlePhase.ENEMY_TURN:
-			return "敌方回合"
-		GameEnums.BattlePhase.VICTORY:
-			return "胜利"
-		GameEnums.BattlePhase.FAILURE:
-			return "失败"
-	return "未知"
-
-
-func _side_text(side: GameEnums.BattleSide) -> String:
-	if side == GameEnums.BattleSide.PLAYER:
-		return "玩家"
-	return "敌方"
-
-
-func _failure_code_text(code: GameEnums.ActionFailureCode) -> String:
-	match code:
-		GameEnums.ActionFailureCode.NONE:
-			return "没有错误"
-		GameEnums.ActionFailureCode.INVALID_REQUEST:
-			return "行动请求无效"
-		GameEnums.ActionFailureCode.INVALID_BATTLE:
-			return "战斗状态无效"
-		GameEnums.ActionFailureCode.INVALID_PHASE:
-			return "当前阶段不允许此行动"
-		GameEnums.ActionFailureCode.BATTLE_NOT_ACTIVE:
-			return "战斗尚未进入行动阶段"
-		GameEnums.ActionFailureCode.WRONG_TURN:
-			return "当前不是该行动方的回合"
-		GameEnums.ActionFailureCode.ACTOR_NOT_FOUND:
-			return "找不到行动单位"
-		GameEnums.ActionFailureCode.ACTOR_SIDE_MISMATCH:
-			return "行动单位不属于请求方"
-		GameEnums.ActionFailureCode.ACTOR_DEFEATED:
-			return "行动单位已经被击败"
-		GameEnums.ActionFailureCode.ACTOR_NOT_PLACED:
-			return "行动单位尚未放置"
-		GameEnums.ActionFailureCode.DESTINATION_OUT_OF_BOUNDS:
-			return "目标格超出棋盘"
-		GameEnums.ActionFailureCode.DESTINATION_BLOCKED:
-			return "目标格不可通行"
-		GameEnums.ActionFailureCode.DESTINATION_OCCUPIED:
-			return "目标格已被占用"
-		GameEnums.ActionFailureCode.DESTINATION_UNCHANGED:
-			return "目标格就是当前位置"
-		GameEnums.ActionFailureCode.NO_PATH:
-			return "不存在可用路径"
-		GameEnums.ActionFailureCode.INSUFFICIENT_AP:
-			return "行动点不足"
-		GameEnums.ActionFailureCode.ART_NOT_FOUND:
-			return "找不到指定技艺"
-		GameEnums.ActionFailureCode.ART_NOT_USABLE:
-			return "该技艺无法主动使用"
-		GameEnums.ActionFailureCode.ART_ON_COOLDOWN:
-			return "该技艺仍在冷却"
-		GameEnums.ActionFailureCode.INVALID_TARGET_SELECTION:
-			return "目标选择无效"
-		GameEnums.ActionFailureCode.ART_EXECUTION_UNAVAILABLE:
-			return "技艺执行尚未开放"
-		GameEnums.ActionFailureCode.UNSUPPORTED_ACTION:
-			return "当前不支持此类行动"
-		GameEnums.ActionFailureCode.STATE_CHANGED:
-			return "战斗状态已经发生变化"
-	return "未知错误"

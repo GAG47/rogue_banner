@@ -13,6 +13,7 @@ This file applies to the entire repository. More detailed rules are defined in:
 - `docs/core_types.md`
 - `docs/data_model.md`
 - `docs/battle_kernel.md`
+- `docs/art_effect_system.md`
 - `docs/development_roadmap.md`
 
 ## Language and Naming

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="BuffDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/buff_definition.gd" id="1_buff"]
+[ext_resource type="Script" path="res://scripts/definitions/modifier_definition.gd" id="2_modifier"]
+
+[sub_resource type="Resource" id="Modifier_attack"]
+script = ExtResource("2_modifier")
+attribute = 1
+operation = 0
+value = 1.0
+
+[resource]
+script = ExtResource("1_buff")
+content_id = &"debug_battle_focus"
+display_name = "战斗专注"
+duration_turns = 2
+stacking_rule = 1
+maximum_stacks = 2
+modifiers = [SubResource("Modifier_attack")]

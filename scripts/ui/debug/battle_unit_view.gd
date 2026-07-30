@@ -11,6 +11,7 @@ const TEXT_COLOR: Color = Color("f7f9fb")
 @export_range(32.0, 128.0, 1.0) var cell_size: float = 76.0
 
 var _battle: BattleState
+var _attribute_calculator: AttributeCalculator = AttributeCalculator.new()
 
 
 func present(battle_state: BattleState) -> void:
@@ -65,8 +66,9 @@ func _draw_unit(unit: UnitState, coordinate: Vector2i) -> void:
 			TEXT_COLOR
 	)
 
-	var health_text: String = "生命%d  行动点%d" % [
+	var health_text: String = "生命%d  护盾%d  行动点%d" % [
 		unit.current_health,
+		unit.current_shield,
 		unit.current_ap,
 	]
 	draw_string(
@@ -82,7 +84,13 @@ func _draw_unit(unit: UnitState, coordinate: Vector2i) -> void:
 
 
 func _draw_health_bar(unit: UnitState, center: Vector2) -> void:
-	if unit.definition == null or unit.definition.max_health <= 0:
+	if unit.definition == null:
+		return
+	var maximum_health: int = _attribute_calculator.calculate(
+			unit,
+			GameEnums.AttributeType.MAX_HEALTH
+	)
+	if maximum_health <= 0:
 		return
 
 	var bar_rect: Rect2 = Rect2(
@@ -90,7 +98,7 @@ func _draw_health_bar(unit: UnitState, center: Vector2) -> void:
 			Vector2(cell_size * 0.62, 6.0)
 	)
 	var health_ratio: float = clampf(
-			float(unit.current_health) / float(unit.definition.max_health),
+			float(unit.current_health) / float(maximum_health),
 			0.0,
 			1.0
 	)

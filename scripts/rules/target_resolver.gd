@@ -6,5 +6,6 @@ extends RefCounted
 @abstract
 func resolve(
 		definition: TargetingDefinition,
-		context: TargetingContext
-) -> TargetSelection
+		context: TargetingContext,
+		selection: TargetSelection
+) -> TargetResolutionResult

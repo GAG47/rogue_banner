@@ -7,6 +7,7 @@ var active_side: GameEnums.BattleSide = GameEnums.BattleSide.PLAYER
 var round_number: int = 0
 var _units: Dictionary[int, UnitState] = {}
 var _next_unit_instance_id: int = 1
+var _next_event_sequence_id: int = 1
 
 
 static func create(grid_state: GridState) -> BattleState:
@@ -64,3 +65,11 @@ func _remove_unit(unit_id: int) -> UnitState:
 		return null
 	_units.erase(unit_id)
 	return unit
+
+
+func _stamp_event(event: BattleEvent) -> bool:
+	if event == null or event.sequence_id != 0:
+		return false
+	event.stamp(_next_event_sequence_id)
+	_next_event_sequence_id += 1
+	return true

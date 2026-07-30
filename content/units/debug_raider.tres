@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="UnitDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="UnitDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/unit_definition.gd" id="1_unit"]
+[ext_resource type="Resource" path="res://content/arts/debug_reactive_guard.tres" id="2_guard"]
 
 [resource]
 script = ExtResource("1_unit")
@@ -9,4 +10,5 @@ display_name = "袭击者"
 max_health = 8
 base_attack = 2
 max_ap = 4
-slot_count = 0
+slot_count = 1
+default_arts = [ExtResource("2_guard")]

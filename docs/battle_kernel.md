@@ -239,21 +239,21 @@ side, and returns the resulting phase, side, and round in
 
 ## Use Art Boundary
 
-Use Art v2 validates:
+Use Art v2 established the request and validation boundary. Version 3 now
+completes:
 
 - Active side and actor
 - Installed Art slot
 - Active Art category
 - Cooldown
 - AP
-- Basic target count
+- Typed target resolution
+- Use Conditions
+- Effect planning and ordered execution
+- AP and cooldown commitment
+- Passive events and terminal Battle resolution
 
-Concrete target resolution, Conditions, Effects, cooldown commitment, and AP
-commit belong to the Art and Effect phase. A structurally valid v2 request
-returns `ART_EXECUTION_UNAVAILABLE`.
-
-This explicit rejection guarantees that an Art cannot spend AP or start
-cooldown without executing its effects.
+The final Use Art contract is recorded in `docs/art_effect_system.md`.
 
 ## Atomicity
 
@@ -262,7 +262,7 @@ Predictable validation occurs before mutation.
 - Failed placement does not add a Unit or occupant.
 - Failed movement does not change occupancy or AP.
 - Failed End Turn does not change phase, side, round, AP, or cooldown.
-- Unavailable Art execution does not change AP or cooldown.
+- Rejected Art execution does not change AP or cooldown.
 - Unit removal clears occupancy before unregistering Unit State.
 
 UI and enemy decision systems must submit requests to the action service. They
@@ -284,7 +284,7 @@ Headless tests cover:
 - Atomic failure behavior
 - Side ownership
 - Turn transitions, AP refresh, and cooldown progress
-- Non-committing Use Art entry
+- Use Art request validation boundary
 - Defeated Unit cleanup
 
 ## Debug Visualization
@@ -304,6 +304,11 @@ The debug controller never writes Grid occupancy, Unit AP, or turn state
 directly. It submits `MoveActionRequest` and `EndTurnActionRequest` instances to
 `BattleActionService`, then redraws from the resulting authoritative state.
 Enemy decisions, attacks, damage, and Art execution remain outside v2.1.
+
+Version 3 extends the same scene with Art selection, target validation, effect
+feedback, Buffs, shield, passive triggers, and terminal resolution. The scene
+remains a presentation probe and submits every gameplay change through
+`BattleActionService`.
 
 The scene is intentionally not configured as the project main scene. It can be
 opened and run directly as a debug probe without changing project startup

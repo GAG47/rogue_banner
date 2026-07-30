@@ -1,6 +1,21 @@
 class_name BattleTurnService
 extends RefCounted
 
+var _attribute_calculator: AttributeCalculator
+var _buff_service: BuffService
+
+
+func _init(
+		attribute_calculator: AttributeCalculator = null,
+		buff_service: BuffService = null
+) -> void:
+	_attribute_calculator = attribute_calculator
+	if _attribute_calculator == null:
+		_attribute_calculator = AttributeCalculator.new()
+	_buff_service = buff_service
+	if _buff_service == null:
+		_buff_service = BuffService.new(_attribute_calculator)
+
 
 func start_battle(battle: BattleState) -> TurnTransitionResult:
 	if battle == null or battle.grid == null or not battle.grid.is_valid():
@@ -12,12 +27,13 @@ func start_battle(battle: BattleState) -> TurnTransitionResult:
 	battle.phase = GameEnums.BattlePhase.PLAYER_TURN
 	battle.active_side = GameEnums.BattleSide.PLAYER
 	battle.round_number = 1
-	_refresh_side(battle, GameEnums.BattleSide.PLAYER)
-	return TurnTransitionResult.success(
+	var result: TurnTransitionResult = TurnTransitionResult.success(
 			previous_side,
 			battle.active_side,
 			battle.round_number
 	)
+	result.events.assign(_refresh_side(battle, GameEnums.BattleSide.PLAYER))
+	return result
 
 
 func end_turn(
@@ -40,17 +56,37 @@ func end_turn(
 		battle.phase = GameEnums.BattlePhase.PLAYER_TURN
 		battle.round_number += 1
 
-	_refresh_side(battle, battle.active_side)
-	return TurnTransitionResult.success(
+	var result: TurnTransitionResult = TurnTransitionResult.success(
 			previous_side,
 			battle.active_side,
 			battle.round_number
 	)
+	result.events.assign(_refresh_side(battle, battle.active_side))
+	return result
 
 
-func _refresh_side(battle: BattleState, side: GameEnums.BattleSide) -> void:
+func _refresh_side(
+	battle: BattleState,
+	side: GameEnums.BattleSide
+) -> Array[BattleEvent]:
+	var events: Array[BattleEvent] = []
 	for unit: UnitState in battle.get_units_for_side(side):
-		unit.refresh_for_turn()
+		var expired_buffs: Array[BuffState] = _buff_service.advance_turn(unit)
+		for buff: BuffState in expired_buffs:
+			events.append(
+					BuffRemovedEvent.create(
+							buff.source_unit_id,
+							unit.instance_id,
+							buff.definition
+					)
+			)
+		unit.refresh_for_turn(
+				_attribute_calculator.calculate(
+						unit,
+						GameEnums.AttributeType.MAX_AP
+				)
+		)
+	return events
 
 
 func _is_active_phase(phase: GameEnums.BattlePhase) -> bool:

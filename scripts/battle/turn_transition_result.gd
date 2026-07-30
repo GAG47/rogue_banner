@@ -6,6 +6,7 @@ var failure_code: GameEnums.ActionFailureCode = GameEnums.ActionFailureCode.NONE
 var previous_side: GameEnums.BattleSide = GameEnums.BattleSide.PLAYER
 var active_side: GameEnums.BattleSide = GameEnums.BattleSide.PLAYER
 var round_number: int = 0
+var events: Array[BattleEvent] = []
 
 
 static func success(

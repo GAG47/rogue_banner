@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/debug/battle_debug_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://scripts/ui/debug/battle_grid_view.gd" id="2_grid"]
@@ -9,6 +9,7 @@
 [ext_resource type="Resource" path="res://content/terrains/debug_wall.tres" id="7_wall"]
 [ext_resource type="Resource" path="res://content/units/debug_vanguard.tres" id="8_player"]
 [ext_resource type="Resource" path="res://content/units/debug_raider.tres" id="9_enemy"]
+[ext_resource type="Script" path="res://scripts/ui/debug/battle_debug_status_view.gd" id="10_status"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.082, 0.11, 0.15, 0.96)
@@ -34,17 +35,13 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
-[node name="BattleDebug" type="Node2D" node_paths=PackedStringArray("grid_view", "highlight_view", "unit_view", "phase_label", "round_label", "selected_unit_label", "feedback_label", "end_turn_button", "reset_button")]
+[node name="BattleDebug" type="Node2D" node_paths=PackedStringArray("grid_view", "highlight_view", "unit_view", "status_view", "feedback_label")]
 script = ExtResource("1_controller")
 grid_view = NodePath("BattleBoard/GridView")
 highlight_view = NodePath("BattleBoard/HighlightView")
 unit_view = NodePath("BattleBoard/UnitView")
-phase_label = NodePath("Interface/StatusPanel/PanelMargin/StatusContent/PhaseLabel")
-round_label = NodePath("Interface/StatusPanel/PanelMargin/StatusContent/RoundLabel")
-selected_unit_label = NodePath("Interface/StatusPanel/PanelMargin/StatusContent/SelectedUnitLabel")
+status_view = NodePath("Interface/StatusPanel/PanelMargin/StatusContent")
 feedback_label = NodePath("Interface/FeedbackPanel/FeedbackLabel")
-end_turn_button = NodePath("Interface/StatusPanel/PanelMargin/StatusContent/ButtonRow/EndTurnButton")
-reset_button = NodePath("Interface/StatusPanel/PanelMargin/StatusContent/ButtonRow/ResetButton")
 ground_terrain = ExtResource("5_ground")
 difficult_terrain = ExtResource("6_difficult")
 blocked_terrain = ExtResource("7_wall")
@@ -84,7 +81,7 @@ offset_right = 650.0
 offset_bottom = 73.0
 theme_override_colors/font_color = Color(0.88, 0.94, 0.98, 1)
 theme_override_font_sizes/font_size = 28
-text = "战斗内核 2.1"
+text = "技艺与效果系统 v3"
 
 [node name="SceneSubtitle" type="Label" parent="Interface"]
 offset_left = 57.0
@@ -93,19 +90,20 @@ offset_right = 650.0
 offset_bottom = 96.0
 theme_override_colors/font_color = Color(0.5, 0.62, 0.72, 1)
 theme_override_font_sizes/font_size = 14
-text = "棋盘、移动、行动点与回合规则的交互式验证场景"
+text = "目标、效果、增益、被动触发与战斗结算的交互式验证场景"
 
 [node name="StatusPanel" type="PanelContainer" parent="Interface"]
-anchors_preset = 3
+anchors_preset = 11
 anchor_left = 1.0
 anchor_top = 0.0
 anchor_right = 1.0
-anchor_bottom = 0.0
+anchor_bottom = 1.0
 offset_left = -352.0
 offset_top = 28.0
 offset_right = -28.0
-offset_bottom = 520.0
+offset_bottom = -28.0
 grow_horizontal = 0
+grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 
 [node name="PanelMargin" type="MarginContainer" parent="Interface/StatusPanel"]
@@ -115,9 +113,18 @@ theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 20
 
-[node name="StatusContent" type="VBoxContainer" parent="Interface/StatusPanel/PanelMargin"]
+[node name="StatusContent" type="VBoxContainer" parent="Interface/StatusPanel/PanelMargin" node_paths=PackedStringArray("phase_label", "round_label", "selected_unit_label", "art_selector", "art_status_label", "use_art_button", "end_turn_button", "reset_button")]
 layout_mode = 2
 theme_override_constants/separation = 13
+script = ExtResource("10_status")
+phase_label = NodePath("StatusScroll/StatusDetails/PhaseLabel")
+round_label = NodePath("StatusScroll/StatusDetails/RoundLabel")
+selected_unit_label = NodePath("StatusScroll/StatusDetails/SelectedUnitLabel")
+art_selector = NodePath("StatusScroll/StatusDetails/ArtSelector")
+art_status_label = NodePath("StatusScroll/StatusDetails/ArtStatusLabel")
+use_art_button = NodePath("StatusScroll/StatusDetails/UseArtButton")
+end_turn_button = NodePath("ButtonRow/EndTurnButton")
+reset_button = NodePath("ButtonRow/ResetButton")
 
 [node name="PanelTitle" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
 layout_mode = 2
@@ -128,43 +135,70 @@ text = "战斗状态"
 [node name="Divider" type="HSeparator" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
 layout_mode = 2
 
-[node name="PhaseLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
+[node name="StatusScroll" type="ScrollContainer" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="StatusDetails" type="VBoxContainer" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 13
+
+[node name="PhaseLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.88, 0.92, 0.96, 1)
 theme_override_font_sizes/font_size = 16
 text = "阶段：准备
 当前行动方：玩家"
 
-[node name="RoundLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
+[node name="RoundLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.88, 0.92, 0.96, 1)
 theme_override_font_sizes/font_size = 16
 text = "轮次：1"
 
-[node name="UnitDivider" type="HSeparator" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
+[node name="UnitDivider" type="HSeparator" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
 layout_mode = 2
 
-[node name="SelectedUnitLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
-custom_minimum_size = Vector2(0, 120)
+[node name="SelectedUnitLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
+custom_minimum_size = Vector2(0, 104)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.88, 0.92, 0.96, 1)
 theme_override_font_sizes/font_size = 15
 text = "当前单位
 未选择"
 
-[node name="HelpLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
+[node name="ArtDivider" type="HSeparator" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
+layout_mode = 2
+
+[node name="ArtSelector" type="OptionButton" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ArtStatusLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.78, 0.86, 1)
+theme_override_font_sizes/font_size = 13
+text = "技艺：未选择"
+autowrap_mode = 2
+
+[node name="UseArtButton" type="Button" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "使用技艺"
+
+[node name="HelpLabel" type="Label" parent="Interface/StatusPanel/PanelMargin/StatusContent/StatusScroll/StatusDetails"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.58, 0.67, 0.75, 1)
 theme_override_font_sizes/font_size = 13
-text = "点击蓝色单位查看可移动范围。
-点击高亮格子提交移动请求。
+text = "绿色格子表示可移动范围。
+选择技艺后，浅紫表示射程，亮紫表示可选落点。
 敌方决策将在后续阶段实现。"
 autowrap_mode = 2
-
-[node name="ButtonSpacer" type="Control" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
-custom_minimum_size = Vector2(0, 4)
-layout_mode = 2
-size_flags_vertical = 3
 
 [node name="ButtonRow" type="HBoxContainer" parent="Interface/StatusPanel/PanelMargin/StatusContent"]
 layout_mode = 2
