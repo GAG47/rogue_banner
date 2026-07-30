@@ -1,0 +1,74 @@
+class_name GameEnums
+extends RefCounted
+
+enum ArtRarity {
+	COMMON,
+	UNCOMMON,
+	RARE,
+}
+
+enum ArtCategory {
+	ATTACK,
+	SKILL,
+	PASSIVE,
+}
+
+enum BattleSide {
+	PLAYER,
+	ENEMY,
+}
+
+enum BattlePhase {
+	SETUP,
+	PLAYER_TURN,
+	ENEMY_TURN,
+	VICTORY,
+	FAILURE,
+}
+
+enum TargetRelation {
+	SELF,
+	ALLY,
+	ENEMY,
+	NEUTRAL,
+	ANY,
+}
+
+enum TargetKind {
+	CELL,
+	UNIT,
+	TERRAIN_OBJECT,
+	BATTLE,
+}
+
+enum EnemyRank {
+	STANDARD,
+	ELITE,
+	BOSS,
+}
+
+enum ConditionStatus {
+	PASSED,
+	FAILED,
+	INVALID_CONTEXT,
+}
+
+enum EffectStatus {
+	SUCCEEDED,
+	FAILED,
+	INVALID_CONTEXT,
+}
+
+enum DefinitionValidationCode {
+	EMPTY_ID,
+	INVALID_VALUE,
+	NULL_REFERENCE,
+	DUPLICATE_REFERENCE,
+	INVALID_REFERENCE,
+	INVALID_TAG,
+	INVALID_INSTALL_CONDITION,
+	INVALID_TARGETING,
+	MISSING_EFFECT,
+	MISSING_TRIGGER,
+	UNSUPPORTED_DEFINITION,
+}

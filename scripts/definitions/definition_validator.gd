@@ -1,0 +1,478 @@
+class_name DefinitionValidator
+extends RefCounted
+
+
+func validate(definition: DefinitionResource) -> DefinitionValidationResult:
+	var result: DefinitionValidationResult = DefinitionValidationResult.new()
+	if definition == null:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				&"definition",
+				"Definition cannot be null."
+		)
+		return result
+
+	_validate_base(definition, result)
+
+	if definition is HeroDefinition:
+		_validate_hero(definition as HeroDefinition, result)
+	elif definition is UnitDefinition:
+		_validate_unit(definition as UnitDefinition, result)
+	elif definition is ArtDefinition:
+		_validate_art(definition as ArtDefinition, result)
+	elif definition is RelicDefinition:
+		_validate_relic(definition as RelicDefinition, result)
+	elif definition is ScrollDefinition:
+		_validate_scroll(definition as ScrollDefinition, result)
+	elif definition is EnemyDefinition:
+		_validate_enemy(definition as EnemyDefinition, result)
+	elif definition is TerrainDefinition:
+		_validate_terrain(definition as TerrainDefinition, result)
+	elif definition is TagDefinition:
+		pass
+	else:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.UNSUPPORTED_DEFINITION,
+				&"definition",
+				"Definition type is not supported by the core data validator."
+		)
+
+	return result
+
+
+func _validate_base(
+		definition: DefinitionResource,
+		result: DefinitionValidationResult
+) -> void:
+	if definition.content_id == &"":
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.EMPTY_ID,
+				&"content_id",
+				"Content ID is required."
+		)
+
+
+func _validate_hero(
+		definition: HeroDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	for index: int in range(definition.starting_units.size()):
+		_validate_reference(
+				definition.starting_units[index],
+				_indexed_path(&"starting_units", index),
+				result
+		)
+
+	var seen_starting_relics: Array[StringName] = []
+	for index: int in range(definition.starting_relics.size()):
+		_validate_unique_reference(
+				definition.starting_relics[index],
+				seen_starting_relics,
+				_indexed_path(&"starting_relics", index),
+				result
+		)
+
+	var seen_exclusive_relics: Array[StringName] = []
+	for index: int in range(definition.exclusive_relics.size()):
+		_validate_unique_reference(
+				definition.exclusive_relics[index],
+				seen_exclusive_relics,
+				_indexed_path(&"exclusive_relics", index),
+				result
+		)
+
+	var seen_art_pool: Array[StringName] = []
+	for index: int in range(definition.art_pool.size()):
+		_validate_unique_reference(
+				definition.art_pool[index],
+				seen_art_pool,
+				_indexed_path(&"art_pool", index),
+				result
+		)
+
+	var seen_preferred_tags: Array[StringName] = []
+	for index: int in range(definition.preferred_tags.size()):
+		var tag_weight: TagWeight = definition.preferred_tags[index]
+		var entry_path: StringName = _indexed_path(&"preferred_tags", index)
+		if tag_weight == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					entry_path,
+					"Preferred tag entries cannot be null."
+			)
+			continue
+		_validate_unique_reference(
+				tag_weight.tag,
+				seen_preferred_tags,
+				_child_path(entry_path, &"tag"),
+				result
+		)
+		if tag_weight.weight <= 0.0:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					_child_path(entry_path, &"weight"),
+					"Preferred tag weight must be greater than zero."
+			)
+
+
+func _validate_unit(
+		definition: UnitDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	if definition.max_health <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"max_health",
+				"Maximum health must be greater than zero."
+		)
+	if definition.base_attack < 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"base_attack",
+				"Base attack cannot be negative."
+		)
+	if definition.max_ap <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"max_ap",
+				"Maximum AP must be greater than zero."
+		)
+	if definition.slot_count < 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"slot_count",
+				"Slot count cannot be negative."
+		)
+	if definition.default_arts.size() > definition.slot_count:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"default_arts",
+				"Default Art count cannot exceed slot count."
+		)
+
+	_validate_tags(definition.tags, &"tags", result)
+
+	for index: int in range(definition.default_arts.size()):
+		var art: ArtDefinition = definition.default_arts[index]
+		var art_path: StringName = _indexed_path(&"default_arts", index)
+		if not _validate_reference(art, art_path, result):
+			continue
+		_validate_default_art_installation(definition, art, art_path, result)
+
+
+func _validate_art(
+		definition: ArtDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	if definition.ap_cost < 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"ap_cost",
+				"AP cost cannot be negative."
+		)
+	if definition.cooldown < 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"cooldown",
+				"Cooldown cannot be negative."
+		)
+
+	_validate_tags(definition.required_tags, &"required_tags", result)
+	_validate_conditions(
+			definition.installation_conditions,
+			&"installation_conditions",
+			result
+	)
+	_validate_conditions(definition.use_conditions, &"use_conditions", result)
+	_validate_effects(
+			definition.effects,
+			&"effects",
+			definition.category != GameEnums.ArtCategory.PASSIVE,
+			result
+	)
+	_validate_triggers(
+			definition.passive_triggers,
+			&"passive_triggers",
+			definition.category == GameEnums.ArtCategory.PASSIVE,
+			result
+	)
+
+	if definition.category == GameEnums.ArtCategory.PASSIVE:
+		if definition.targeting != null:
+			definition.targeting.validate_configuration(result, &"targeting")
+	elif definition.targeting == null:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				&"targeting",
+				"Active Arts require targeting configuration."
+		)
+	else:
+		definition.targeting.validate_configuration(result, &"targeting")
+
+	if definition.upgraded_variant != null:
+		_validate_reference(definition.upgraded_variant, &"upgraded_variant", result)
+		_validate_art_upgrade_chain(definition, result)
+
+
+func _validate_relic(
+		definition: RelicDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	_validate_triggers(definition.passive_triggers, &"passive_triggers", true, result)
+
+
+func _validate_scroll(
+		definition: ScrollDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	if definition.max_stack_size <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"max_stack_size",
+				"Maximum stack size must be greater than zero."
+		)
+	if definition.targeting == null:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				&"targeting",
+				"Scrolls require targeting configuration."
+		)
+	else:
+		definition.targeting.validate_configuration(result, &"targeting")
+
+	_validate_conditions(definition.use_conditions, &"use_conditions", result)
+	_validate_effects(definition.effects, &"effects", true, result)
+
+
+func _validate_enemy(
+		definition: EnemyDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	_validate_reference(definition.unit_definition, &"unit_definition", result)
+
+
+func _validate_terrain(
+		definition: TerrainDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	if definition.movement_cost < 1:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"movement_cost",
+				"Movement cost must be at least one."
+		)
+	_validate_tags(definition.tags, &"tags", result)
+
+
+func _validate_tags(
+		tags: Array[TagDefinition],
+		field_path: StringName,
+		result: DefinitionValidationResult
+) -> void:
+	var seen_tags: Array[StringName] = []
+	for index: int in range(tags.size()):
+		_validate_unique_reference(
+				tags[index],
+				seen_tags,
+				_indexed_path(field_path, index),
+				result,
+				GameEnums.DefinitionValidationCode.INVALID_TAG
+		)
+
+
+func _validate_conditions(
+		conditions: Array[ConditionDefinition],
+		field_path: StringName,
+		result: DefinitionValidationResult
+) -> void:
+	for index: int in range(conditions.size()):
+		var condition: ConditionDefinition = conditions[index]
+		var condition_path: StringName = _indexed_path(field_path, index)
+		if condition == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					condition_path,
+					"Condition references cannot be null."
+			)
+			continue
+		condition.validate_configuration(result, condition_path)
+
+
+func _validate_effects(
+		effects: Array[EffectDefinition],
+		field_path: StringName,
+		required: bool,
+		result: DefinitionValidationResult
+) -> void:
+	if required and effects.is_empty():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.MISSING_EFFECT,
+				field_path,
+				"At least one effect is required."
+		)
+
+	for index: int in range(effects.size()):
+		var effect: EffectDefinition = effects[index]
+		var effect_path: StringName = _indexed_path(field_path, index)
+		if effect == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					effect_path,
+					"Effect references cannot be null."
+			)
+			continue
+		effect.validate_configuration(result, effect_path)
+
+
+func _validate_triggers(
+		triggers: Array[TriggerDefinition],
+		field_path: StringName,
+		required: bool,
+		result: DefinitionValidationResult
+) -> void:
+	if required and triggers.is_empty():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.MISSING_TRIGGER,
+				field_path,
+				"At least one trigger is required."
+		)
+
+	for index: int in range(triggers.size()):
+		var trigger: TriggerDefinition = triggers[index]
+		var trigger_path: StringName = _indexed_path(field_path, index)
+		if trigger == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					trigger_path,
+					"Trigger references cannot be null."
+			)
+			continue
+		trigger.validate_configuration(result, trigger_path)
+
+
+func _validate_reference(
+		reference: DefinitionResource,
+		field_path: StringName,
+		result: DefinitionValidationResult
+) -> bool:
+	if reference == null:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				field_path,
+				"Definition references cannot be null."
+		)
+		return false
+	if reference.content_id == &"":
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.EMPTY_ID,
+				field_path,
+				"Referenced definitions require a content ID."
+		)
+		return false
+	return true
+
+
+func _validate_unique_reference(
+		reference: DefinitionResource,
+		seen_content_ids: Array[StringName],
+		field_path: StringName,
+		result: DefinitionValidationResult,
+		duplicate_code: GameEnums.DefinitionValidationCode = (
+				GameEnums.DefinitionValidationCode.DUPLICATE_REFERENCE
+		)
+) -> bool:
+	if not _validate_reference(reference, field_path, result):
+		return false
+	if seen_content_ids.has(reference.content_id):
+		result.add_issue(
+				duplicate_code,
+				field_path,
+				"Duplicate definition references are not allowed in this field."
+		)
+		return false
+	seen_content_ids.append(reference.content_id)
+	return true
+
+
+func _validate_default_art_installation(
+		unit: UnitDefinition,
+		art: ArtDefinition,
+		field_path: StringName,
+		result: DefinitionValidationResult
+) -> void:
+	for required_tag: TagDefinition in art.required_tags:
+		if required_tag == null or required_tag.content_id == &"":
+			continue
+		if not _unit_has_tag(unit, required_tag):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_INSTALL_CONDITION,
+					field_path,
+					"Default Art tag requirements are not satisfied by the Unit."
+			)
+
+	for index: int in range(art.installation_conditions.size()):
+		var condition: ConditionDefinition = art.installation_conditions[index]
+		var condition_path: StringName = StringName(
+				"%s.installation_conditions[%d]" % [String(field_path), index]
+		)
+		if condition == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					condition_path,
+					"Default Art installation conditions cannot be null."
+			)
+			continue
+		condition.validate_configuration(result, condition_path)
+
+
+func _unit_has_tag(unit: UnitDefinition, required_tag: TagDefinition) -> bool:
+	for unit_tag: TagDefinition in unit.tags:
+		if unit_tag == required_tag:
+			return true
+		if (
+				unit_tag != null
+				and unit_tag.content_id != &""
+				and unit_tag.content_id == required_tag.content_id
+		):
+			return true
+	return false
+
+
+func _validate_art_upgrade_chain(
+		definition: ArtDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	var seen_instances: Array[int] = []
+	var seen_content_ids: Array[StringName] = []
+	var current: ArtDefinition = definition
+
+	while current != null:
+		var instance_id: int = current.get_instance_id()
+		if seen_instances.has(instance_id):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_REFERENCE,
+					&"upgraded_variant",
+					"Art upgrade variants cannot form a cycle."
+			)
+			return
+		seen_instances.append(instance_id)
+
+		if current.content_id != &"":
+			if seen_content_ids.has(current.content_id):
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_REFERENCE,
+						&"upgraded_variant",
+						"Art upgrade variants must use distinct content IDs."
+				)
+				return
+			seen_content_ids.append(current.content_id)
+
+		current = current.upgraded_variant
+
+
+func _child_path(parent: StringName, child: StringName) -> StringName:
+	return StringName("%s.%s" % [String(parent), String(child)])
+
+
+func _indexed_path(field_path: StringName, index: int) -> StringName:
+	return StringName("%s[%d]" % [String(field_path), index])

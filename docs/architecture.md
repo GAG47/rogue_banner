@@ -32,6 +32,7 @@ res://
 │   ├── terrains/
 │   └── units/
 ├── docs/
+│   └── development_logs/
 ├── scenes/
 │   ├── battle/
 │   ├── debug/
@@ -132,6 +133,10 @@ objects must not be written back into shared Resources.
 Use typed Resource references while the game is running. Stable content IDs are
 used only at catalog, save, and migration boundaries. Display names must never
 serve as identifiers.
+
+Battle-owned `UnitState` and Run-owned `RunUnitState` are separate runtime
+types. Run state never retains Battle AP, cooldown, side, or grid position, and
+Battle never mutates the Run team directly.
 
 ## Scene and Script Responsibilities
 

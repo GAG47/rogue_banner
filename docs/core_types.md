@@ -22,6 +22,23 @@ to validated types before entering domain code.
 - Stable IDs are required for catalogs and saves.
 - Raw ID values do not replace typed domain references inside gameplay code.
 
+## Core Data Layer v1
+
+Implemented v1 contracts are recorded in `docs/data_model.md`. The implemented
+set contains:
+
+- `GameEnums`
+- `DefinitionResource` and `DefinitionValidator`
+- `TagDefinition`, `HeroDefinition`, `UnitDefinition`, `ArtDefinition`,
+  `RelicDefinition`, `ScrollDefinition`, `EnemyDefinition`, and
+  `TerrainDefinition`
+- Condition, Effect, Targeting, and Trigger base contracts
+- `ArtState`, `UnitState`, `RunUnitState`, `ScrollStackState`, `BattleState`,
+  and `RunState`
+
+Other types in this inventory remain planned contracts and must not be treated
+as implemented APIs.
+
 ## Enums
 
 | Type | Responsibility |
@@ -51,7 +68,7 @@ must not be encoded as enum members.
 | `HeroDefinition` | Initial relics, exclusive pools, tag preferences, Art pools, and starting configuration |
 | `UnitDefinition` | Maximum health, base attack, maximum AP, slots, tags, and default Arts |
 | `ArtDefinition` | Rarity, category, AP cost, cooldown, targeting, requirements, effects, and upgrade data |
-| `ArtUpgradeDefinition` | A typed variant or set of definition changes |
+| `ArtDefinition.upgraded_variant` | A typed upgraded Art variant |
 | `RelicDefinition` | Run or battle triggers, conditions, and configured effects |
 | `ScrollDefinition` | Carrying rules, targeting, requirements, and one-use effects |
 | `EnemyDefinition` | Base unit definition, decision policy, phases, and reward references |
@@ -70,6 +87,7 @@ or any other per-run mutable value.
 | Type | Authoritative data |
 | --- | --- |
 | `UnitState` | Definition reference, health, AP, position, installed Arts, Buffs, and defeat state |
+| `RunUnitState` | Run-owned Unit health and installed Art references without Battle state |
 | `ArtState` | Art definition reference, upgrade variant, cooldown, and per-battle usage state |
 | `BuffState` | Buff definition reference, source, stacks, and remaining duration |
 | `GridState` | Bounds, cells, terrain references, and occupancy |
@@ -160,7 +178,7 @@ to their source state.
 | `ArtInstallRequest` | Unit, Art, and slot selection |
 | `ArtInstallResult` | Installation success or typed requirement failure |
 | `ArtUseQuery` | Read-only validation and preview request |
-| `ArtUpgradeDefinition` | Data-driven upgraded variant |
+| `ArtDefinition.upgraded_variant` | Data-driven upgraded variant |
 | `PassiveSubscription` | Runtime binding from an installed passive Art to typed events |
 
 Installation validation uses slot rules and conditions. Art execution submits a
@@ -230,4 +248,3 @@ UI receives read models and sends requests. Planned read models include:
 
 Read models may format already-computed state for presentation, but they do not
 recalculate gameplay validity, damage, range, rewards, or intent targets.
-

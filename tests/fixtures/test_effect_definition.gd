@@ -1,0 +1,2 @@
+class_name TestEffectDefinition
+extends EffectDefinition
