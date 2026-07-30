@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UnitDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/unit_definition.gd" id="1_unit"]
+
+[resource]
+script = ExtResource("1_unit")
+content_id = &"debug_vanguard"
+display_name = "先锋"
+max_health = 10
+base_attack = 2
+max_ap = 5
+slot_count = 0

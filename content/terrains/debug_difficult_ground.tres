@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="TerrainDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/terrain_definition.gd" id="1_terrain"]
+
+[resource]
+script = ExtResource("1_terrain")
+content_id = &"debug_difficult_ground"
+display_name = "困难地面"
+movement_cost = 2

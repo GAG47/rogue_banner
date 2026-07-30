@@ -287,3 +287,24 @@ Headless tests cover:
 - Non-committing Use Art entry
 - Defeated Unit cleanup
 
+## Debug Visualization
+
+Battle kernel v2.1 adds `battle_debug.tscn` as a presentation-only executable
+probe. It composes authored debug Terrain and Unit Resources with the v2
+services and renders:
+
+- Terrain traversal cost and blocking
+- Unit and scene-object occupancy
+- Player Unit selection
+- Reachable Move destinations obtained from action validation
+- Move AP cost and committed Unit position
+- Player and enemy turn transitions
+
+The debug controller never writes Grid occupancy, Unit AP, or turn state
+directly. It submits `MoveActionRequest` and `EndTurnActionRequest` instances to
+`BattleActionService`, then redraws from the resulting authoritative state.
+Enemy decisions, attacks, damage, and Art execution remain outside v2.1.
+
+The scene is intentionally not configured as the project main scene. It can be
+opened and run directly as a debug probe without changing project startup
+configuration.

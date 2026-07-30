@@ -6,6 +6,7 @@ func _init() -> void:
 	CoreDataLayerTest.run(suite)
 	GridStateTest.run(suite)
 	BattleKernelTest.run(suite)
+	BattleDebugSceneTest.run(suite)
 
 	if suite.passed():
 		print("PASS: %d project assertions." % suite.assertion_count)
