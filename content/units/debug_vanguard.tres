@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="UnitDefinition" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="UnitDefinition" load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/definitions/unit_definition.gd" id="1_unit"]
 [ext_resource type="Resource" path="res://content/arts/debug_strike.tres" id="2_strike"]
 [ext_resource type="Resource" path="res://content/arts/debug_guard.tres" id="3_guard"]
 [ext_resource type="Resource" path="res://content/arts/debug_focus.tres" id="4_focus"]
+[ext_resource type="Resource" path="res://content/arts/debug_shove.tres" id="5_shove"]
 
 [resource]
 script = ExtResource("1_unit")
@@ -12,5 +13,5 @@ display_name = "先锋"
 max_health = 10
 base_attack = 2
 max_ap = 5
-slot_count = 3
-default_arts = [ExtResource("2_strike"), ExtResource("3_guard"), ExtResource("4_focus")]
+slot_count = 4
+default_arts = [ExtResource("2_strike"), ExtResource("3_guard"), ExtResource("4_focus"), ExtResource("5_shove")]

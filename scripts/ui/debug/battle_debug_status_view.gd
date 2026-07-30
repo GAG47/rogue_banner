@@ -91,7 +91,8 @@ func present(
 	battle: BattleState,
 	selected_unit_id: int,
 	selected_art_slot_index: int,
-	pending_art_slot_index: int
+	pending_art_slot_index: int,
+	intent_previews: Array[IntentPreview] = []
 ) -> void:
 	if battle == null:
 		_present_unavailable()
@@ -101,7 +102,10 @@ func present(
 		BattleDebugTextFormatter.phase_text(battle.phase),
 		BattleDebugTextFormatter.side_text(battle.active_side),
 	]
-	round_label.text = "轮次：%d" % battle.round_number
+	round_label.text = _round_and_intent_text(
+			battle.round_number,
+			intent_previews
+	)
 	end_turn_button.disabled = (
 		battle.phase == GameEnums.BattlePhase.VICTORY
 		or battle.phase == GameEnums.BattlePhase.FAILURE
@@ -120,6 +124,39 @@ func present(
 			selected_art_slot_index,
 			pending_art_slot_index
 	)
+
+
+func _round_and_intent_text(
+		round_number: int,
+		previews: Array[IntentPreview]
+) -> String:
+	var lines: Array[String] = ["轮次：%d", "敌人意图："]
+	lines[0] = lines[0] % round_number
+	if previews.is_empty():
+		lines.append("无")
+		return "\n".join(lines)
+	for preview: IntentPreview in previews:
+		if preview == null:
+			continue
+		var kind_text: String = "锁定"
+		if preview.kind == GameEnums.IntentKind.PATTERN:
+			kind_text = "图形"
+		elif preview.kind == GameEnums.IntentKind.ENHANCE:
+			kind_text = "强化"
+		var detail: String = "单位%d：%s（%s）" % [
+			preview.actor_unit_id,
+			preview.intent_name,
+			kind_text,
+		]
+		if preview.has_move_destination:
+			detail += " → 移动至%d,%d" % [
+				preview.move_destination.x,
+				preview.move_destination.y,
+			]
+		if not preview.currently_valid:
+			detail += "〔当前可能落空〕"
+		lines.append(detail)
+	return "\n".join(lines)
 
 
 func _present_unavailable() -> void:

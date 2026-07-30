@@ -8,6 +8,7 @@ func _init() -> void:
 	BattleKernelTest.run(suite)
 	ArtRuleTest.run(suite)
 	ArtEffectSystemTest.run(suite)
+	EnemyIntentSystemTest.run(suite)
 	BattleDebugSceneTest.run(suite)
 
 	if suite.passed():

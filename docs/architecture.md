@@ -183,7 +183,10 @@ selection produces typed target data, never arbitrary dictionaries.
 
 Locked intents store a resolved target snapshot. Pattern intents store a
 targeting pattern and resolve it from the enemy's current execution position.
-Preview and execution both use the same intent plan.
+Preview and execution both consume the same persistent intent plan. The plan
+stores authored commitments such as target identity, destination, direction,
+Art slot, and step order. It does not retain resolved hits or a short-lived
+Art execution plan.
 
 ### Effects
 
@@ -230,6 +233,11 @@ weight calculation, and selection are separate operations so tests can verify
 each stage. Reward eligibility is owned by Rewards, not by the generic random
 utility.
 
+Enemy priority decisions derive their random stream from Battle seed, round,
+enemy identity, phase, and decision progress. Equal seed and Battle state
+therefore produce equal Intent selections without storing mutable random state
+in a Definition.
+
 ## Battle Action Pipeline
 
 Every player, enemy, art, and system action uses one authoritative pipeline:
@@ -258,6 +266,17 @@ Enemy decision logic produces an intent plan. Intent preview reads it, and enemy
 execution submits its action through the same Battle action pipeline used by
 other actions. Multi-stage enemies select decision policies through typed phase
 state rather than content-specific branches in Battle.
+
+Battle-owned `EnemyState` stores phase, fixed-cycle progress, and the current
+plan. Locked targets and fixed movement destinations never retarget after the
+plan is published. Pattern geometry keeps its published direction but resolves
+from the enemy's current position, so forced movement changes both preview and
+execution consistently.
+
+`BattleFlowService` owns the transaction spanning a player End Turn request,
+ordered enemy plans, the enemy End Turn request, and next-player-turn Intent
+generation. Expected battlefield disruption produces a typed fizzle and does
+not block later enemies. Internal rule failures discard the complete flow.
 
 ## Run, Reward, and Map Boundaries
 

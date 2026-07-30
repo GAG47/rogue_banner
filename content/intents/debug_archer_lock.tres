@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="IntentDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/intents/intent_definition.gd" id="1_intent"]
+[ext_resource type="Resource" path="res://content/arts/debug_enemy_shot.tres" id="2_art"]
+
+[resource]
+script = ExtResource("1_intent")
+content_id = &"debug_archer_lock"
+display_name = "锁定射击"
+kind = 0
+art = ExtResource("2_art")
+target_rule = 1
+movement_rule = 0
+sequence = 0

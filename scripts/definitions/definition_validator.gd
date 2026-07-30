@@ -30,6 +30,8 @@ func validate(definition: DefinitionResource) -> DefinitionValidationResult:
 		_validate_terrain(definition as TerrainDefinition, result)
 	elif definition is BuffDefinition:
 		_validate_buff(definition as BuffDefinition, result)
+	elif definition is IntentDefinition:
+		_validate_intent(definition as IntentDefinition, result)
 	elif definition is TagDefinition:
 		pass
 	else:
@@ -292,7 +294,299 @@ func _validate_enemy(
 		definition: EnemyDefinition,
 		result: DefinitionValidationResult
 ) -> void:
-	_validate_reference(definition.unit_definition, &"unit_definition", result)
+	if _validate_reference(
+			definition.unit_definition,
+			&"unit_definition",
+			result
+	):
+		_append_prefixed_issues(
+				result,
+				validate(definition.unit_definition),
+				&"unit_definition"
+		)
+
+	if definition.available_intents.is_empty():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_ENEMY,
+				&"available_intents",
+				"Enemy definitions require at least one available Intent."
+		)
+	var seen_intents: Array[StringName] = []
+	for index: int in range(definition.available_intents.size()):
+		var intent: IntentDefinition = definition.available_intents[index]
+		var intent_path: StringName = _indexed_path(&"available_intents", index)
+		if not _validate_unique_reference(
+			intent,
+			seen_intents,
+			intent_path,
+			result
+		):
+			continue
+		_append_prefixed_issues(result, validate(intent), intent_path)
+		if not _unit_has_art(definition.unit_definition, intent.art):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENEMY,
+					intent_path,
+					"Enemy Intents must reference an installed default Art."
+			)
+
+	if definition.default_decision == null:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				&"default_decision",
+				"Enemy definitions require a default decision policy."
+		)
+	else:
+		_validate_decision_policy(
+				definition.default_decision,
+				definition.available_intents,
+				&"default_decision",
+				result
+		)
+
+	var seen_phase_ids: Array[StringName] = []
+	for index: int in range(definition.phases.size()):
+		var phase: EnemyPhaseDefinition = definition.phases[index]
+		var phase_path: StringName = _indexed_path(&"phases", index)
+		if phase == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					phase_path,
+					"Enemy phase references cannot be null."
+			)
+			continue
+		if phase.phase_id == &"" or seen_phase_ids.has(phase.phase_id):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENEMY,
+					_child_path(phase_path, &"phase_id"),
+					"Enemy phase IDs must be non-empty and unique."
+			)
+		else:
+			seen_phase_ids.append(phase.phase_id)
+		_validate_conditions(
+				phase.entry_conditions,
+				_child_path(phase_path, &"entry_conditions"),
+				GameEnums.ConditionContextKind.ENEMY_DECISION,
+				result
+		)
+		if phase.decision_policy == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					_child_path(phase_path, &"decision_policy"),
+					"Enemy phases require a decision policy."
+			)
+		else:
+			_validate_decision_policy(
+					phase.decision_policy,
+					definition.available_intents,
+					_child_path(phase_path, &"decision_policy"),
+					result
+			)
+
+
+func _validate_intent(
+		definition: IntentDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	if not _validate_reference(definition.art, &"art", result):
+		return
+	_append_prefixed_issues(result, validate(definition.art), &"art")
+	if definition.art.category == GameEnums.ArtCategory.PASSIVE:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_INTENT,
+				&"art",
+				"Enemy Intents require an active Art."
+		)
+	if definition.art.targeting == null:
+		return
+
+	var expected_kind: GameEnums.TargetKind = _intent_target_kind(definition)
+	if definition.art.targeting.target_kind != expected_kind:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_INTENT,
+				&"target_rule",
+				"Intent target rules must match the referenced Art targeting kind."
+		)
+	if (
+		definition.kind == GameEnums.IntentKind.PATTERN
+		and definition.target_rule
+		!= GameEnums.IntentTargetRule.NEAREST_OPPONENT_UNIT
+	):
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_INTENT,
+				&"target_rule",
+				"Pattern Intents currently orient toward an opponent Unit."
+		)
+	if (
+		definition.kind == GameEnums.IntentKind.ENHANCE
+		and definition.target_rule
+		not in [
+			GameEnums.IntentTargetRule.SELF,
+			GameEnums.IntentTargetRule.LOWEST_HEALTH_ALLY_UNIT,
+		]
+	):
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_INTENT,
+				&"target_rule",
+				"Enhance Intents require a self or allied Unit target rule."
+		)
+	if (
+		definition.movement_rule == GameEnums.IntentMovementRule.NONE
+		and definition.sequence != GameEnums.IntentSequence.ART_ONLY
+	):
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_INTENT,
+				&"sequence",
+				"Intents without movement must use an Art-only sequence."
+		)
+	if (
+		definition.movement_rule != GameEnums.IntentMovementRule.NONE
+		and definition.sequence == GameEnums.IntentSequence.ART_ONLY
+	):
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_INTENT,
+				&"sequence",
+				"Intents with movement must declare its execution order."
+		)
+
+
+func _validate_decision_policy(
+		policy: EnemyDecisionPolicyDefinition,
+		available_intents: Array[IntentDefinition],
+		field_path: StringName,
+		result: DefinitionValidationResult
+) -> void:
+	if policy is FixedCycleDecisionDefinition:
+		var fixed: FixedCycleDecisionDefinition = (
+			policy as FixedCycleDecisionDefinition
+		)
+		if fixed.sequence.is_empty():
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENEMY,
+					field_path,
+					"Fixed-cycle policies require at least one Intent."
+			)
+		for index: int in range(fixed.sequence.size()):
+			_validate_policy_intent_reference(
+					fixed.sequence[index],
+					available_intents,
+					_indexed_path(
+							_child_path(field_path, &"sequence"),
+							index
+					),
+					result
+			)
+		return
+	if policy is PriorityDecisionDefinition:
+		var priority: PriorityDecisionDefinition = (
+			policy as PriorityDecisionDefinition
+		)
+		if priority.candidates.is_empty():
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENEMY,
+					field_path,
+					"Priority policies require at least one candidate."
+			)
+		for index: int in range(priority.candidates.size()):
+			var candidate: IntentCandidateDefinition = priority.candidates[index]
+			var candidate_path: StringName = _indexed_path(
+					_child_path(field_path, &"candidates"),
+					index
+			)
+			if candidate == null:
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+						candidate_path,
+						"Intent candidates cannot be null."
+				)
+				continue
+			_validate_policy_intent_reference(
+					candidate.intent,
+					available_intents,
+					_child_path(candidate_path, &"intent"),
+					result
+			)
+			if not is_finite(candidate.weight) or candidate.weight <= 0.0:
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_VALUE,
+						_child_path(candidate_path, &"weight"),
+						"Intent candidate weight must be finite and positive."
+				)
+			_validate_conditions(
+					candidate.conditions,
+					_child_path(candidate_path, &"conditions"),
+					GameEnums.ConditionContextKind.ENEMY_DECISION,
+					result
+			)
+		return
+	result.add_issue(
+			GameEnums.DefinitionValidationCode.INVALID_ENEMY,
+			field_path,
+			"Enemy decision policy type is not supported."
+	)
+
+
+func _validate_policy_intent_reference(
+		intent: IntentDefinition,
+		available_intents: Array[IntentDefinition],
+		field_path: StringName,
+		result: DefinitionValidationResult
+) -> void:
+	if intent == null:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				field_path,
+				"Decision policy Intent references cannot be null."
+		)
+		return
+	for available: IntentDefinition in available_intents:
+		if (
+			available == intent
+			or (
+				available != null
+				and available.content_id != &""
+				and available.content_id == intent.content_id
+			)
+		):
+			return
+	result.add_issue(
+			GameEnums.DefinitionValidationCode.INVALID_ENEMY,
+			field_path,
+			"Decision policies may only reference available Enemy Intents."
+	)
+
+
+func _intent_target_kind(
+		definition: IntentDefinition
+) -> GameEnums.TargetKind:
+	if definition.kind == GameEnums.IntentKind.PATTERN:
+		return GameEnums.TargetKind.CELL
+	match definition.target_rule:
+		GameEnums.IntentTargetRule.NEAREST_OPPONENT_CELL:
+			return GameEnums.TargetKind.CELL
+		GameEnums.IntentTargetRule.NEAREST_SCENE_OBJECT:
+			return GameEnums.TargetKind.TERRAIN_OBJECT
+		_:
+			return GameEnums.TargetKind.UNIT
+
+
+func _unit_has_art(
+		unit: UnitDefinition,
+		art: ArtDefinition
+) -> bool:
+	if unit == null or art == null:
+		return false
+	for installed: ArtDefinition in unit.default_arts:
+		if (
+			installed == art
+			or (
+				installed != null
+				and installed.content_id != &""
+				and installed.content_id == art.content_id
+			)
+		):
+			return true
+	return false
 
 
 func _validate_terrain(

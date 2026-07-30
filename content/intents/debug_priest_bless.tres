@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="IntentDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/intents/intent_definition.gd" id="1_intent"]
+[ext_resource type="Resource" path="res://content/arts/debug_enemy_blessing.tres" id="2_art"]
+
+[resource]
+script = ExtResource("1_intent")
+content_id = &"debug_priest_bless"
+display_name = "守护祷言"
+kind = 2
+art = ExtResource("2_art")
+target_rule = 3
+movement_rule = 0
+sequence = 0

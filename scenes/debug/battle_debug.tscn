@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/debug/battle_debug_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://scripts/ui/debug/battle_grid_view.gd" id="2_grid"]
@@ -8,8 +8,10 @@
 [ext_resource type="Resource" path="res://content/terrains/debug_difficult_ground.tres" id="6_difficult"]
 [ext_resource type="Resource" path="res://content/terrains/debug_wall.tres" id="7_wall"]
 [ext_resource type="Resource" path="res://content/units/debug_vanguard.tres" id="8_player"]
-[ext_resource type="Resource" path="res://content/units/debug_raider.tres" id="9_enemy"]
+[ext_resource type="Resource" path="res://content/enemies/debug_archer.tres" id="9_archer"]
 [ext_resource type="Script" path="res://scripts/ui/debug/battle_debug_status_view.gd" id="10_status"]
+[ext_resource type="Resource" path="res://content/enemies/debug_heavy.tres" id="11_heavy"]
+[ext_resource type="Resource" path="res://content/enemies/debug_priest.tres" id="12_priest"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 bg_color = Color(0.082, 0.11, 0.15, 0.96)
@@ -46,7 +48,9 @@ ground_terrain = ExtResource("5_ground")
 difficult_terrain = ExtResource("6_difficult")
 blocked_terrain = ExtResource("7_wall")
 player_unit_definition = ExtResource("8_player")
-enemy_unit_definition = ExtResource("9_enemy")
+archer_enemy_definition = ExtResource("9_archer")
+heavy_enemy_definition = ExtResource("11_heavy")
+priest_enemy_definition = ExtResource("12_priest")
 
 [node name="BackgroundLayer" type="CanvasLayer" parent="."]
 layer = -1
@@ -81,7 +85,7 @@ offset_right = 650.0
 offset_bottom = 73.0
 theme_override_colors/font_color = Color(0.88, 0.94, 0.98, 1)
 theme_override_font_sizes/font_size = 28
-text = "技艺与效果系统 v3"
+text = "敌人意图与自动回合 v4"
 
 [node name="SceneSubtitle" type="Label" parent="Interface"]
 offset_left = 57.0
@@ -90,7 +94,7 @@ offset_right = 650.0
 offset_bottom = 96.0
 theme_override_colors/font_color = Color(0.5, 0.62, 0.72, 1)
 theme_override_font_sizes/font_size = 14
-text = "目标、效果、增益、被动触发与战斗结算的交互式验证场景"
+text = "阅读敌方计划，通过走位、推击和击杀改变意图结果"
 
 [node name="StatusPanel" type="PanelContainer" parent="Interface"]
 anchors_preset = 11
@@ -195,9 +199,9 @@ text = "使用技艺"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.58, 0.67, 0.75, 1)
 theme_override_font_sizes/font_size = 13
-text = "绿色格子表示可移动范围。
-选择技艺后，浅紫表示射程，亮紫表示可选落点。
-敌方决策将在后续阶段实现。"
+text = "绿色表示玩家移动，紫色表示技艺目标。
+红色表示敌方当前危险格，橙色表示计划移动路线。
+敌人只执行已经公布的计划，不会临时更换目标。"
 autowrap_mode = 2
 
 [node name="ButtonRow" type="HBoxContainer" parent="Interface/StatusPanel/PanelMargin/StatusContent"]

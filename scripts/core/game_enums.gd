@@ -118,6 +118,8 @@ enum ActionFailureCode {
 	UNSUPPORTED_ACTION,
 	STATE_CHANGED,
 	CONDITION_CONTEXT_INVALID,
+	INTENT_GENERATION_FAILED,
+	INTENT_EXECUTION_FAILED,
 }
 
 enum TargetRelation {
@@ -182,6 +184,7 @@ enum ConditionContextKind {
 	ART_INSTALL,
 	ACTION_USE,
 	EVENT_TRIGGER,
+	ENEMY_DECISION,
 }
 
 enum SideRelation {
@@ -192,6 +195,69 @@ enum SideRelation {
 enum TriggerSourceKind {
 	ART,
 	BUFF,
+}
+
+enum CardinalDirection {
+	UP,
+	RIGHT,
+	DOWN,
+	LEFT,
+}
+
+enum IntentKind {
+	LOCKED,
+	PATTERN,
+	ENHANCE,
+}
+
+enum IntentTargetRule {
+	SELF,
+	NEAREST_OPPONENT_UNIT,
+	NEAREST_OPPONENT_CELL,
+	LOWEST_HEALTH_ALLY_UNIT,
+	NEAREST_SCENE_OBJECT,
+}
+
+enum IntentMovementRule {
+	NONE,
+	TOWARD_TARGET,
+}
+
+enum IntentDirectionRule {
+	FIXED,
+	TOWARD_TARGET,
+}
+
+enum IntentSequence {
+	ART_ONLY,
+	MOVE_THEN_ART,
+	ART_THEN_MOVE,
+}
+
+enum IntentStepStatus {
+	EXECUTED,
+	FIZZLED,
+	SKIPPED,
+	INTERNAL_FAILURE,
+}
+
+enum IntentExecutionStatus {
+	COMPLETED,
+	SKIPPED,
+	INTERNAL_FAILURE,
+}
+
+enum NumericComparison {
+	LESS_THAN,
+	LESS_OR_EQUAL,
+	GREATER_THAN,
+	GREATER_OR_EQUAL,
+}
+
+enum ForcedMovementDirection {
+	AWAY_FROM_ACTOR,
+	TOWARD_ACTOR,
+	FIXED,
 }
 
 enum ArtLoadoutCode {
@@ -241,4 +307,6 @@ enum DefinitionValidationCode {
 	INVALID_MODIFIER,
 	INVALID_BUFF,
 	UNSUPPORTED_DEFINITION,
+	INVALID_INTENT,
+	INVALID_ENEMY,
 }

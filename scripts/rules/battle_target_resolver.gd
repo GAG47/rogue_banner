@@ -74,6 +74,7 @@ func resolve(
 			battle.grid,
 			resolved.aim_cells,
 			definition.affected_offsets,
+			selection,
 			resolved.affected_cells
 	)
 	_resolve_hits(battle, actor, definition, resolved)
@@ -187,12 +188,19 @@ func _resolve_affected_cells(
 	grid: GridState,
 	aim_cells: Array[Vector2i],
 	offsets: Array[Vector2i],
+	selection: TargetSelection,
 	affected_cells: Array[Vector2i]
 ) -> void:
 	affected_cells.clear()
 	for aim_cell: Vector2i in aim_cells:
 		for offset: Vector2i in offsets:
-			var coordinate: Vector2i = aim_cell + offset
+			var resolved_offset: Vector2i = offset
+			if selection != null and selection.has_orientation:
+				resolved_offset = GridDirection.rotate_from_right(
+						offset,
+						selection.orientation
+				)
+			var coordinate: Vector2i = aim_cell + resolved_offset
 			if (
 				grid.is_in_bounds(coordinate)
 				and not affected_cells.has(coordinate)

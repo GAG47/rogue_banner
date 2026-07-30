@@ -320,6 +320,12 @@ feedback, Buffs, shield, passive triggers, and terminal resolution. The scene
 remains a presentation probe and submits every gameplay change through
 `BattleActionService`.
 
+Version 4 extends it with three configurable enemies, published Intent badges,
+danger Cells, movement previews, player forced movement, and automatic enemy
+turns. Intent preview reads the same stored plan that execution consumes.
+Enemy movement and Art use remain requests to `BattleActionService`; the debug
+controller never executes an Effect or mutates enemy state directly.
+
 The scene is intentionally not configured as the project main scene. It can be
 opened and run directly as a debug probe without changing project startup
 configuration.

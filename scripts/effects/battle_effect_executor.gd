@@ -79,6 +79,8 @@ func _execute_plan(
 		return _execute_remove_buff(battle, actor_unit_id, plan)
 	if plan.definition is MoveEffectDefinition:
 		return _execute_move(battle, plan)
+	if plan.definition is ForcedMovementEffectDefinition:
+		return _execute_forced_movement(battle, actor_unit_id, plan)
 	return EffectResult.failure(GameEnums.EffectStatus.INVALID_DEFINITION)
 
 
@@ -281,3 +283,84 @@ func _execute_move(
 	result.events.append(movement.event)
 	result.affected_unit_ids.append(plan.target_unit_ids[0])
 	return result
+
+
+func _execute_forced_movement(
+		battle: BattleState,
+		actor_unit_id: int,
+		plan: EffectExecutionPlan
+) -> EffectResult:
+	var definition: ForcedMovementEffectDefinition = (
+		plan.definition as ForcedMovementEffectDefinition
+	)
+	var actor_position: GridCoordinate = battle.grid.find_occupant(
+			GameEnums.GridOccupantKind.UNIT,
+			actor_unit_id
+	)
+	if definition == null or actor_position == null:
+		return EffectResult.failure(GameEnums.EffectStatus.INVALID_CONTEXT)
+
+	var result: EffectResult = EffectResult.success()
+	for target_unit_id: int in plan.target_unit_ids:
+		var target: UnitState = battle.get_unit(target_unit_id)
+		var target_position: GridCoordinate = battle.grid.find_occupant(
+				GameEnums.GridOccupantKind.UNIT,
+				target_unit_id
+		)
+		if target == null or target_position == null:
+			return EffectResult.failure(GameEnums.EffectStatus.STATE_CHANGED)
+		if target.is_defeated():
+			continue
+
+		var direction: Vector2i = _forced_direction(
+				definition,
+				actor_position.value,
+				target_position.value
+		)
+		if direction == Vector2i.ZERO:
+			continue
+		var path: Array[Vector2i] = [target_position.value]
+		var destination: Vector2i = target_position.value
+		for step: int in range(definition.distance):
+			var candidate: Vector2i = destination + direction
+			if not battle.grid.can_place_at(candidate).succeeded():
+				break
+			destination = candidate
+			path.append(destination)
+		if path.size() < 2:
+			continue
+
+		var movement: BattleMovementResult = _movement_service.commit_path(
+				battle,
+				target_unit_id,
+				path
+		)
+		if not movement.succeeded:
+			return EffectResult.failure(GameEnums.EffectStatus.STATE_CHANGED)
+		result.events.append(movement.event)
+		result.affected_unit_ids.append(target_unit_id)
+	return result
+
+
+func _forced_direction(
+		definition: ForcedMovementEffectDefinition,
+		actor_position: Vector2i,
+		target_position: Vector2i
+) -> Vector2i:
+	if (
+		definition.direction_rule
+		== GameEnums.ForcedMovementDirection.FIXED
+	):
+		return GridDirection.to_vector(definition.fixed_direction)
+	var delta: Vector2i = target_position - actor_position
+	if delta == Vector2i.ZERO:
+		return Vector2i.ZERO
+	var direction: Vector2i = GridDirection.to_vector(
+			GridDirection.from_delta(delta)
+	)
+	if (
+		definition.direction_rule
+		== GameEnums.ForcedMovementDirection.TOWARD_ACTOR
+	):
+		direction = -direction
+	return direction

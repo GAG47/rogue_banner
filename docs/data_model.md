@@ -16,6 +16,11 @@ resolution, concrete generic effects, typed Battle events, passive triggers,
 Art loadouts, and terminal Battle resolution. The final v3 contracts are
 detailed in `docs/art_effect_system.md`.
 
+Enemy Intent system v4 extends it with Enemy decision configuration,
+Battle-owned Enemy state, persistent Intent plans, deterministic generation,
+read-only preview, and automatic enemy turns. The final v4 contracts are
+detailed in `docs/enemy_intent_system.md`.
+
 All Definition types are Godot `Resource` classes registered with `class_name`.
 All runtime State types are `RefCounted` classes created uniquely for a Run or
 Battle.
@@ -128,9 +133,14 @@ Quantity belongs to `ScrollStackState`, never to the shared Scroll Definition.
 | --- | --- | --- |
 | `unit_definition` | `UnitDefinition` | Required static combat attributes and Arts |
 | `rank` | `GameEnums.EnemyRank` | Standard, elite, or Boss classification |
+| `available_intents` | `Array[IntentDefinition]` | Complete authored Intent set available to this enemy |
+| `default_decision` | `EnemyDecisionPolicyDefinition` | Required policy outside a matched phase |
+| `phases` | `Array[EnemyPhaseDefinition]` | Optional prioritized Boss phase configuration |
 
-Decision policies, Intent plans, and phase behavior are deliberately absent from
-v1 and belong to the Enemy and Intent phase.
+An Intent Definition references an installed active Art and configures target
+commitment, direction, movement, and step order. It never duplicates Art costs,
+target geometry, or Effects. Current phase, cycle progress, and generated plans
+belong to `EnemyState`, not this shared Resource.
 
 ### TerrainDefinition
 
@@ -226,10 +236,12 @@ Definition mutation.
 Battle State v2 contains:
 
 - Grid State
+- Battle seed
 - Battle phase
 - Active side
 - Round number
 - Battle-owned Unit State indexed by Battle-local ID
+- Battle-owned Enemy State indexed by its Unit Battle ID
 - A monotonic Battle-local Unit ID allocator
 - A monotonic Battle event sequence allocator
 
@@ -237,11 +249,31 @@ Grid State owns all positions and occupancy. Battle State owns Unit identity and
 combat values. Action and turn services mutate these owners only through their
 explicit APIs.
 
-`BattleTransaction` creates a short-lived deep working copy of Grid, Unit, Art,
-Buff, turn, and allocator state. Battle start and actions execute completely on
-that copy. A successful result is copied back into the existing authoritative
-objects; any internal failure discards it. The working copy is never exposed as
-a second long-lived state source.
+`BattleTransaction` creates a short-lived deep working copy of Grid, Unit,
+Enemy, Intent, Art, Buff, turn, seed, and allocator state. Battle start,
+actions, and complete automatic enemy-turn flows execute on that copy. A
+successful result is copied back into the existing authoritative objects; any
+internal failure discards it. The working copy is never exposed as a second
+long-lived state source.
+
+### EnemyState and IntentPlan
+
+`EnemyState` is Battle-owned and shares identity with its associated enemy
+`UnitState`. It stores only:
+
+- Current phase ID
+- Fixed-cycle progress
+- Current published `IntentPlan`
+
+`IntentPlan` stores the commitments previewed to the player: actor, generation
+round, Intent and Art references, installed slot, locked target selection,
+fixed movement destination, cardinal direction, and action order. It does not
+store Unit health, occupancy, resolved hits, or a v3 `ActionExecutionPlan`.
+
+Locked plans retain Unit, Cell, or scene-object identity and never retarget.
+Pattern plans retain direction and resolve geometry from the actor's current
+position. Preview is derived from the stored plan and current authoritative
+Battle state; it cannot mutate the plan.
 
 ### RunState
 
@@ -293,6 +325,10 @@ configuration cannot assume Unit data on a turn-only event.
 This separation prevents authored Effect Resources from owning mutable Battle
 state or searching the scene tree. Version 3 adds planning and execution for
 damage, healing, shield, movement, Apply Buff, and Remove Buff effects.
+
+Version 4 adds generic forced movement. Direction may be fixed or relative to
+the actor and target, and movement is committed one valid Cell at a time
+through the same Grid movement service used by other Battle movement.
 
 Effects resolve the actor, hit Units, or event Units through
 `EffectTargetSource` and publish typed Battle events. Scaled effects combine a
@@ -347,6 +383,9 @@ Definition schema validation. It checks:
 - Condition-context and event-payload compatibility
 - Modifier and Buff configuration
 - Complete Art upgrade variants, cycles, and repeated upgrade content IDs
+- Complete Enemy Unit, Intent, decision policy, and phase graphs
+- Intent target-kind, sequence, movement, Art-installation, and direction compatibility
+- Enemy-decision Condition context compatibility
 
 Expected validation failures are returned as
 `DefinitionValidationResult` containing typed `DefinitionValidationIssue`
@@ -378,3 +417,8 @@ The headless test runner verifies:
 - Damage, healing, shield, movement, Apply Buff, and Remove Buff
 - Typed passive events, event capabilities, stable trigger identity, initial
   turn-start triggers, defeat cleanup, victory, and failure
+- Locked Unit, Cell, and scene-object Intent commitments
+- Pattern preview changes after forced movement
+- Fixed movement destination disruption and continued Art execution
+- Fixed-cycle, conditional priority, deterministic seed, and Boss phase generation
+- Stable enemy execution order, normal fizzles, terminal stop, and automatic-flow rollback

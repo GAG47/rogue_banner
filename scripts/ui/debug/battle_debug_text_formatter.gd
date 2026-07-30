@@ -64,6 +64,41 @@ static func action_result_text(result: ActionExecutionResult) -> String:
 	return "；".join(summaries) + "。"
 
 
+static func battle_flow_text(result: BattleFlowResult) -> String:
+	if result == null or not result.succeeded:
+		return "敌方回合执行失败。"
+	var summaries: Array[String] = []
+	if result.enemy_turn_result != null:
+		for execution: IntentExecutionResult in (
+			result.enemy_turn_result.executions
+		):
+			var executed_steps: int = 0
+			var fizzled_steps: int = 0
+			for step: IntentStepResult in execution.steps:
+				if step.status == GameEnums.IntentStepStatus.EXECUTED:
+					executed_steps += 1
+				elif step.status == GameEnums.IntentStepStatus.FIZZLED:
+					fizzled_steps += 1
+			summaries.append(
+					"敌方单位%d执行%d步，落空%d步" % [
+						execution.actor_unit_id,
+						executed_steps,
+						fizzled_steps,
+					]
+			)
+	if summaries.is_empty():
+		summaries.append("敌方没有可执行的意图")
+	if (
+		result.generation_result != null
+		and result.generation_result.succeeded
+	):
+		summaries.append(
+				"已公布%d个新意图"
+				% result.generation_result.plans.size()
+		)
+	return "；".join(summaries) + "。"
+
+
 static func phase_text(phase: GameEnums.BattlePhase) -> String:
 	match phase:
 		GameEnums.BattlePhase.SETUP:
@@ -149,4 +184,8 @@ static func failure_code_text(code: GameEnums.ActionFailureCode) -> String:
 			return "战斗状态已经发生变化"
 		GameEnums.ActionFailureCode.CONDITION_CONTEXT_INVALID:
 			return "条件所需的数据在当前上下文中不存在"
+		GameEnums.ActionFailureCode.INTENT_GENERATION_FAILED:
+			return "敌人意图生成失败"
+		GameEnums.ActionFailureCode.INTENT_EXECUTION_FAILED:
+			return "敌人意图执行失败"
 	return "未知错误"

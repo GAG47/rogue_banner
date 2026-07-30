@@ -82,6 +82,16 @@ static func create() -> CoreDataFixture:
 	fixture.enemy.content_id = &"training_enemy"
 	fixture.enemy.display_name = "Training Enemy"
 	fixture.enemy.unit_definition = fixture.unit
+	var enemy_intent: IntentDefinition = IntentDefinition.new()
+	enemy_intent.content_id = &"training_enemy_strike"
+	enemy_intent.display_name = "Training Strike"
+	enemy_intent.art = fixture.active_art
+	var enemy_cycle: FixedCycleDecisionDefinition = (
+		FixedCycleDecisionDefinition.new()
+	)
+	enemy_cycle.sequence.append(enemy_intent)
+	fixture.enemy.available_intents.append(enemy_intent)
+	fixture.enemy.default_decision = enemy_cycle
 
 	fixture.terrain = TerrainDefinition.new()
 	fixture.terrain.content_id = &"stone_floor"

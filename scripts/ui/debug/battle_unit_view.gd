@@ -7,15 +7,22 @@ const UNIT_BORDER_COLOR: Color = Color("f2f5f8")
 const HEALTH_COLOR: Color = Color("64d38b")
 const HEALTH_BACKGROUND_COLOR: Color = Color("18212d")
 const TEXT_COLOR: Color = Color("f7f9fb")
+const INTENT_BADGE_COLOR: Color = Color("f6c453")
+const INTENT_BADGE_TEXT_COLOR: Color = Color("18212d")
 
 @export_range(32.0, 128.0, 1.0) var cell_size: float = 76.0
 
 var _battle: BattleState
+var _intent_previews: Array[IntentPreview] = []
 var _attribute_calculator: AttributeCalculator = AttributeCalculator.new()
 
 
-func present(battle_state: BattleState) -> void:
+func present(
+		battle_state: BattleState,
+		intent_previews: Array[IntentPreview] = []
+) -> void:
 	_battle = battle_state
+	_intent_previews.assign(intent_previews)
 	queue_redraw()
 
 
@@ -81,6 +88,9 @@ func _draw_unit(unit: UnitState, coordinate: Vector2i) -> void:
 			TEXT_COLOR
 	)
 	_draw_health_bar(unit, center)
+	var preview: IntentPreview = _find_preview(unit.instance_id)
+	if preview != null:
+		_draw_intent_badge(preview, center)
 
 
 func _draw_health_bar(unit: UnitState, center: Vector2) -> void:
@@ -107,4 +117,30 @@ func _draw_health_bar(unit: UnitState, center: Vector2) -> void:
 			Rect2(bar_rect.position, Vector2(bar_rect.size.x * health_ratio, 6.0)),
 			HEALTH_COLOR,
 			true
+	)
+
+
+func _find_preview(unit_id: int) -> IntentPreview:
+	for preview: IntentPreview in _intent_previews:
+		if preview != null and preview.actor_unit_id == unit_id:
+			return preview
+	return null
+
+
+func _draw_intent_badge(preview: IntentPreview, center: Vector2) -> void:
+	var badge_center: Vector2 = center + Vector2(cell_size * 0.25, -cell_size * 0.2)
+	draw_circle(badge_center, 11.0, INTENT_BADGE_COLOR)
+	var badge_text: String = "锁"
+	if preview.kind == GameEnums.IntentKind.PATTERN:
+		badge_text = "图"
+	elif preview.kind == GameEnums.IntentKind.ENHANCE:
+		badge_text = "强"
+	draw_string(
+			ThemeDB.fallback_font,
+			badge_center + Vector2(-7.0, 5.0),
+			badge_text,
+			HORIZONTAL_ALIGNMENT_CENTER,
+			14.0,
+			12,
+			INTENT_BADGE_TEXT_COLOR
 	)

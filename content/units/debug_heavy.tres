@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="UnitDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/unit_definition.gd" id="1_unit"]
+[ext_resource type="Resource" path="res://content/arts/debug_enemy_sweep.tres" id="2_art"]
+
+[resource]
+script = ExtResource("1_unit")
+content_id = &"debug_heavy"
+display_name = "重甲兵"
+max_health = 14
+base_attack = 2
+max_ap = 5
+slot_count = 1
+default_arts = [ExtResource("2_art")]

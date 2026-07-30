@@ -31,12 +31,17 @@ const BLOCKED_CELLS: Array[Vector2i] = [
 @export var difficult_terrain: TerrainDefinition
 @export var blocked_terrain: TerrainDefinition
 @export var player_unit_definition: UnitDefinition
-@export var enemy_unit_definition: UnitDefinition
+@export var archer_enemy_definition: EnemyDefinition
+@export var heavy_enemy_definition: EnemyDefinition
+@export var priest_enemy_definition: EnemyDefinition
 
 var _battle: BattleState
 var _placement_service: BattlePlacementService = BattlePlacementService.new()
 var _turn_service: BattleTurnService = BattleTurnService.new()
 var _action_service: BattleActionService
+var _flow_service: BattleFlowService
+var _intent_preview_service: IntentPreviewService = IntentPreviewService.new()
+var _intent_previews: Array[IntentPreview] = []
 var _selected_unit_id: int = 0
 var _selected_art_slot_index: int = -1
 var _pending_art_slot_index: int = -1
@@ -52,6 +57,7 @@ func _init() -> void:
 			GridPathfinder.new(),
 			_turn_service
 	)
+	_flow_service = BattleFlowService.new(_action_service)
 
 
 func _ready() -> void:
@@ -144,7 +150,7 @@ func rebuild_debug_battle() -> bool:
 	if not object_result.succeeded():
 		return _fail_rebuild("场景物体设置失败。")
 
-	var battle: BattleState = BattleState.create(grid)
+	var battle: BattleState = BattleState.create(grid, 20260731)
 	var placements: Array[BattlePlacementResult] = [
 		_placement_service.place_unit_definition(
 				battle,
@@ -158,29 +164,32 @@ func rebuild_debug_battle() -> bool:
 				GameEnums.BattleSide.PLAYER,
 				Vector2i(1, 3)
 		),
-		_placement_service.place_unit_definition(
+		_placement_service.place_enemy_definition(
 				battle,
-				enemy_unit_definition,
-				GameEnums.BattleSide.ENEMY,
-				Vector2i(5, 1)
+				archer_enemy_definition,
+				Vector2i(5, 0)
 		),
-		_placement_service.place_unit_definition(
+		_placement_service.place_enemy_definition(
 				battle,
-				enemy_unit_definition,
-				GameEnums.BattleSide.ENEMY,
-				Vector2i(5, 3)
+				heavy_enemy_definition,
+				Vector2i(5, 2)
+		),
+		_placement_service.place_enemy_definition(
+				battle,
+				priest_enemy_definition,
+				Vector2i(5, 4)
 		),
 	]
 	for placement: BattlePlacementResult in placements:
 		if not placement.succeeded():
 			return _fail_rebuild("单位放置失败。")
 
-	var start_result: ActionExecutionResult = _action_service.start_battle(battle)
-	if not start_result.is_successful:
+	var start_result: BattleFlowResult = _flow_service.start_battle(battle)
+	if not start_result.succeeded:
 		return _fail_rebuild("战斗启动失败。")
 
 	_battle = battle
-	_set_feedback("选择蓝色单位后，可以移动或选择技艺。")
+	_set_feedback("敌人已经公布意图。选择蓝色单位进行应对。")
 	_refresh_view()
 	debug_battle_rebuilt.emit()
 	return true
@@ -190,12 +199,18 @@ func get_battle_state() -> BattleState:
 	return _battle
 
 
+func get_intent_previews() -> Array[IntentPreview]:
+	var previews: Array[IntentPreview] = []
+	previews.assign(_intent_previews)
+	return previews
+
+
 func _handle_coordinate_pressed(coordinate: Vector2i) -> void:
 	if (
 		_battle.phase != GameEnums.BattlePhase.PLAYER_TURN
 		or _battle.active_side != GameEnums.BattleSide.PLAYER
 	):
-		_set_feedback("敌方决策尚未实现，请推进回合。")
+		_set_feedback("敌方回合正在由已公布的意图自动执行。")
 		return
 
 	if _pending_art_slot_index >= 0:
@@ -296,11 +311,14 @@ func _coordinates_match(
 func _on_end_turn_pressed() -> void:
 	if _battle == null:
 		return
-	var request: EndTurnActionRequest = EndTurnActionRequest.create(
-			_battle.active_side
-	)
-	var result: ActionExecutionResult = _action_service.execute(_battle, request)
-	if result.is_successful:
+	if (
+		_battle.phase != GameEnums.BattlePhase.PLAYER_TURN
+		or _battle.active_side != GameEnums.BattleSide.PLAYER
+	):
+		_set_feedback("当前不能结束玩家回合。")
+		return
+	var result: BattleFlowResult = _flow_service.end_player_turn(_battle)
+	if result.succeeded:
 		_selected_unit_id = 0
 		_selected_art_slot_index = -1
 		_pending_art_slot_index = -1
@@ -308,10 +326,7 @@ func _on_end_turn_pressed() -> void:
 		_art_range_cells.clear()
 		_targetable_cells.clear()
 		_populate_art_selector()
-		_set_feedback(
-				"回合已推进至%s。"
-				% BattleDebugTextFormatter.side_text(_battle.active_side)
-		)
+		_set_feedback(BattleDebugTextFormatter.battle_flow_text(result))
 	else:
 		_set_feedback(
 				"无法推进回合：%s。"
@@ -446,10 +461,13 @@ func _selection_for_coordinate(
 
 
 func _refresh_view() -> void:
+	_intent_previews.clear()
+	if _battle != null:
+		_intent_previews = _intent_preview_service.build_all(_battle)
 	if grid_view != null:
 		grid_view.present(_battle.grid if _battle != null else null)
 	if unit_view != null:
-		unit_view.present(_battle)
+		unit_view.present(_battle, _intent_previews)
 	_refresh_highlights()
 	_refresh_status()
 
@@ -463,12 +481,21 @@ func _refresh_highlights() -> void:
 				GameEnums.GridOccupantKind.UNIT,
 				_selected_unit_id
 		)
+	var intent_danger_cells: Dictionary[Vector2i, bool] = {}
+	var intent_move_cells: Dictionary[Vector2i, bool] = {}
+	for preview: IntentPreview in _intent_previews:
+		for coordinate: Vector2i in preview.affected_cells:
+			intent_danger_cells[coordinate] = true
+		for coordinate: Vector2i in preview.movement_path:
+			intent_move_cells[coordinate] = true
 	highlight_view.present(
 			selected_coordinate,
 			_hovered_coordinate,
 			_reachable_cells,
 			_art_range_cells,
-			_targetable_cells
+			_targetable_cells,
+			intent_danger_cells,
+			intent_move_cells
 	)
 
 
@@ -478,7 +505,8 @@ func _refresh_status() -> void:
 				_battle,
 				_selected_unit_id,
 				_selected_art_slot_index,
-				_pending_art_slot_index
+				_pending_art_slot_index,
+				_intent_previews
 		)
 
 
@@ -513,7 +541,9 @@ func _has_complete_scene_configuration() -> bool:
 		and difficult_terrain != null
 		and blocked_terrain != null
 		and player_unit_definition != null
-		and enemy_unit_definition != null
+		and archer_enemy_definition != null
+		and heavy_enemy_definition != null
+		and priest_enemy_definition != null
 	)
 
 

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Script" path="res://scripts/intents/fixed_cycle_decision_definition.gd" id="2_policy"]
+[ext_resource type="Resource" path="res://content/units/debug_priest.tres" id="3_unit"]
+[ext_resource type="Resource" path="res://content/intents/debug_priest_bless.tres" id="4_intent"]
+
+[sub_resource type="Resource" id="Decision_cycle"]
+script = ExtResource("2_policy")
+sequence = [ExtResource("4_intent")]
+
+[resource]
+script = ExtResource("1_enemy")
+content_id = &"debug_priest_enemy"
+display_name = "祭司"
+unit_definition = ExtResource("3_unit")
+available_intents = [ExtResource("4_intent")]
+default_decision = SubResource("Decision_cycle")

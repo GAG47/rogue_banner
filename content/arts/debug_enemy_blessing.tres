@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="ArtDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/art_definition.gd" id="1_art"]
+[ext_resource type="Script" path="res://scripts/rules/targeting_definition.gd" id="2_targeting"]
+[ext_resource type="Script" path="res://scripts/effects/shield_effect_definition.gd" id="3_shield"]
+
+[sub_resource type="Resource" id="Targeting_ally"]
+script = ExtResource("2_targeting")
+target_kind = 1
+target_relation = 1
+minimum_range = 1
+maximum_range = 6
+requires_line_of_sight = true
+
+[sub_resource type="Resource" id="Effect_shield"]
+script = ExtResource("3_shield")
+target_source = 1
+flat_amount = 3
+source_attribute = 1
+attribute_multiplier = 0.0
+
+[resource]
+script = ExtResource("1_art")
+content_id = &"debug_enemy_blessing"
+display_name = "守护祷言"
+category = 1
+ap_cost = 1
+cooldown = 0
+targeting = SubResource("Targeting_ally")
+effects = [SubResource("Effect_shield")]

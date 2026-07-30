@@ -70,7 +70,23 @@ implemented set adds:
 - `ArtLoadoutService` for installation, removal, and upgrade variants
 - Defeat cleanup and terminal Battle resolution
 
-Types outside the v1, v2, and v3 implemented sets remain planned contracts.
+## Enemy Intent System v4
+
+Implemented v4 contracts are recorded in `docs/enemy_intent_system.md`. The
+implemented set adds:
+
+- `IntentDefinition`, fixed-cycle and priority decision policy Definitions,
+  reusable enemy-decision Conditions, and typed Enemy phase Definitions
+- Battle-owned `EnemyState` and persistent `IntentPlan`
+- Deterministic Intent generation from Battle seed and authoritative state
+- Locked Unit, Cell, and scene-object commitments
+- Directional pattern footprints with live preview after displacement
+- Enhance intents using the existing Art and Effect system
+- Ordered movement and Art execution through existing Battle action requests
+- Automatic enemy turns with explicit fizzle and internal-failure semantics
+- Transactional Battle start, enemy turn, and next-turn Intent generation
+
+Types outside the v1, v2, v3, and v4 implemented sets remain planned contracts.
 
 ## Enums
 
@@ -81,6 +97,10 @@ Types outside the v1, v2, and v3 implemented sets remain planned contracts.
 | `BattleSide` | Player and enemy ownership |
 | `BattlePhase` | Setup, player turn, enemy turn, victory, and failure |
 | `IntentKind` | Locked, pattern, and enhance intent semantics |
+| `IntentTargetRule` | Locked Unit, Cell, scene object, pattern direction, or self selection |
+| `IntentSequence` | Art-only, Move-then-Art, or Art-then-Move ordering |
+| `IntentStepStatus` | Executed, fizzled, skipped, or internal-failure outcome |
+| `CardinalDirection` | Stable four-direction geometry orientation |
 | `TargetRelation` | Self, ally, enemy, neutral, or any |
 | `TargetKind` | Cell, unit, terrain object, or battle |
 | `ModifierOperation` | Flat, additive, multiplicative, override, and clamp |
@@ -90,7 +110,7 @@ Types outside the v1, v2, and v3 implemented sets remain planned contracts.
 | `BattleEventKind` | Stable typed Battle event categories |
 | `EventUnitRole` | Source or target Unit in a typed Battle event |
 | `EventDataCapability` | Typed payload facts guaranteed by an event kind |
-| `ConditionContextKind` | Installation, action-use, or event-trigger context |
+| `ConditionContextKind` | Installation, action-use, event-trigger, or enemy-decision context |
 | `SideRelation` | Same or opposing side relative to a passive owner |
 | `TriggerSourceKind` | Stable Art or Buff trigger source category |
 | `RewardKind` | Unit, Art, Relic, Scroll, currency, or service |
@@ -113,6 +133,7 @@ must not be encoded as enum members.
 | `ScrollDefinition` | Carrying rules, targeting, requirements, and one-use effects |
 | `EnemyDefinition` | Base unit definition, decision policy, phases, and reward references |
 | `EnemyPhaseDefinition` | Entry condition and decision policy for a phase |
+| `IntentDefinition` | Display data, Art reference, target rule, direction, movement, and step order |
 | `TerrainDefinition` | Blocking, movement cost, interaction, and configured traits |
 | `BuffDefinition` | Duration, stacking, modifiers, triggers, and configured effects |
 | `RewardPoolDefinition` | Weighted authored entries and pool-level constraints |
@@ -133,8 +154,9 @@ or any other per-run mutable value.
 | `GridState` | Bounds, cells, terrain references, and occupancy |
 | `CellState` | Coordinate and terrain; occupancy remains exclusively in Grid State |
 | `TurnState` | Round, active side, phase, and acting order |
-| `BattleState` | Grid, Battle-local Units, phase, active side, round, and Unit ID allocation |
-| `IntentPlan` | Intent kind, actor, execution data, and authoritative preview data |
+| `BattleState` | Grid, Battle-local Units and Enemies, seed, phase, side, round, and identity allocation |
+| `EnemyState` | Current phase, fixed-cycle progress, and current Intent plan |
+| `IntentPlan` | Published actor, Art slot, target commitment, movement destination, direction, and step order |
 | `TeamState` | Owned units and their between-battle configuration |
 | `RelicState` | Relic definition and per-run trigger or charge state |
 | `ScrollStackState` | Scroll definition and current quantity |
@@ -167,10 +189,11 @@ only through its owning command service.
 
 Implemented reusable rule types include Condition composition, event Unit
 relations, event side relations, Battle target resolution, damage, healing,
-shield, movement, Apply Buff, Remove Buff, attribute modifiers, relative
-affected-Cell footprints, and explicit hit requirements. Forced movement,
-directional or rotated footprints, and additional factual content Conditions
-remain planned.
+shield, movement, forced movement, Apply Buff, Remove Buff, attribute
+modifiers, relative affected-Cell footprints, directional rotation, explicit
+hit requirements, health-ratio decisions, and nearby-Unit decisions.
+Additional factual content Conditions remain planned until reusable content
+requires them.
 
 ## Battle Action Types
 
@@ -234,12 +257,17 @@ Battle action; it does not apply effects directly from UI or a Unit node.
 | Type | Responsibility |
 | --- | --- |
 | `EnemyDecisionContext` | Read-only battle facts visible to decision logic |
-| `EnemyDecisionPolicy` | Selects and builds the next intent plan |
-| `LockedIntentData` | Resolved target snapshot retained across movement |
-| `PatternIntentData` | Pattern resolved from the actor's execution position |
-| `EnhanceIntentData` | Self-targeted charging, shielding, or modifier plan |
+| `EnemyDecisionPolicyDefinition` | Typed base policy for selecting a configured Intent |
+| `FixedCycleDecisionDefinition` | Deterministic authored Intent sequence |
+| `PriorityDecisionDefinition` | Condition, priority, weight, and seeded selection policy |
+| `IntentDefinition` | Immutable configurable enemy action description |
+| `IntentPlan` | Stored target, destination, direction, Art slot, and action order |
 | `IntentPreview` | Read-only visualization data derived from an intent plan |
-| `EnemyPhaseState` | Current enemy phase and transition history |
+| `EnemyState` | Current phase, fixed-cycle index, and stored plan |
+| `IntentGenerationService` | Phase evaluation and deterministic plan publication |
+| `IntentExecutor` | Adapts a stored plan to Move and Use Art requests |
+| `EnemyTurnService` | Executes living enemies in stable Battle-ID order |
+| `BattleFlowService` | Owns start and complete automatic-turn transactions |
 
 Intent preview is derived data. It must never become the execution source of
 truth.

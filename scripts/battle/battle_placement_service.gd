@@ -64,6 +64,47 @@ func place_unit_definition(
 	return _commit_placement(battle, unit, coordinate)
 
 
+func place_enemy_definition(
+		battle: BattleState,
+		definition: EnemyDefinition,
+		coordinate: Vector2i
+) -> BattlePlacementResult:
+	var battle_validation: BattlePlacementResult = _validate_battle_for_placement(
+			battle
+	)
+	if not battle_validation.succeeded():
+		return battle_validation
+	if (
+		definition == null
+		or definition.unit_definition == null
+		or not DefinitionValidator.new().validate(definition).is_valid()
+	):
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
+	var cell_validation: GridOperationResult = battle.grid.can_place_at(coordinate)
+	if not cell_validation.succeeded():
+		return BattlePlacementResult.failure(_map_grid_code(cell_validation.code))
+
+	var unit_id: int = battle._allocate_unit_id()
+	var unit: UnitState = UnitState.create(
+			unit_id,
+			definition.unit_definition,
+			GameEnums.BattleSide.ENEMY
+	)
+	var enemy_state: EnemyState = EnemyState.create(unit_id, definition)
+	if unit == null or enemy_state == null:
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
+	return _commit_enemy_placement(
+			battle,
+			unit,
+			enemy_state,
+			coordinate
+	)
+
+
 func remove_unit(
 		battle: BattleState,
 		unit_id: int
@@ -130,6 +171,31 @@ func _commit_placement(
 				GameEnums.BattlePlacementCode.GRID_STATE_REJECTED
 		)
 	return BattlePlacementResult.success(unit.instance_id)
+
+
+func _commit_enemy_placement(
+		battle: BattleState,
+		unit: UnitState,
+		enemy_state: EnemyState,
+		coordinate: Vector2i
+) -> BattlePlacementResult:
+	var placement: BattlePlacementResult = _commit_placement(
+			battle,
+			unit,
+			coordinate
+	)
+	if not placement.succeeded():
+		return placement
+	if battle._register_enemy_state(enemy_state):
+		return placement
+	battle._remove_unit(unit.instance_id)
+	battle.grid.remove_occupant(
+			GameEnums.GridOccupantKind.UNIT,
+			unit.instance_id
+	)
+	return BattlePlacementResult.failure(
+			GameEnums.BattlePlacementCode.GRID_STATE_REJECTED
+	)
 
 
 func _validate_battle_for_placement(

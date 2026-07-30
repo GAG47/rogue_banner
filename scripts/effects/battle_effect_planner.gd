@@ -143,10 +143,11 @@ func _resolve_unit_targets(
 
 func _is_supported_definition(definition: EffectDefinition) -> bool:
 	return (
-		definition is DamageEffectDefinition
-		or definition is HealingEffectDefinition
-		or definition is ShieldEffectDefinition
-		or definition is ApplyBuffEffectDefinition
-		or definition is RemoveBuffEffectDefinition
-		or definition is MoveEffectDefinition
+			definition is DamageEffectDefinition
+			or definition is HealingEffectDefinition
+			or definition is ShieldEffectDefinition
+			or definition is ApplyBuffEffectDefinition
+			or definition is RemoveBuffEffectDefinition
+			or definition is MoveEffectDefinition
+			or definition is ForcedMovementEffectDefinition
 	)

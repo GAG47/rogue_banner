@@ -140,6 +140,9 @@ Gate:
 
 ## Phase 6: Enemies and Intents
 
+Implemented in v4. Final contracts and failure semantics are recorded in
+`docs/enemy_intent_system.md`.
+
 Complete:
 
 - Enemy decision context and policy

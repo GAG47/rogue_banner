@@ -5,6 +5,8 @@ var unit_instance_ids: Array[int] = []
 var cells: Array[Vector2i] = []
 var terrain_object_instance_ids: Array[int] = []
 var targets_battle: bool = false
+var has_orientation: bool = false
+var orientation: GameEnums.CardinalDirection = GameEnums.CardinalDirection.RIGHT
 
 
 func count() -> int:
@@ -22,4 +24,6 @@ func duplicate_selection() -> TargetSelection:
 	selection.cells.assign(cells)
 	selection.terrain_object_instance_ids.assign(terrain_object_instance_ids)
 	selection.targets_battle = targets_battle
+	selection.has_orientation = has_orientation
+	selection.orientation = orientation
 	return selection
