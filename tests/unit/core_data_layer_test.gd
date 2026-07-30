@@ -193,7 +193,6 @@ static func _test_definition_state_separation(suite: TestSuite) -> void:
 	)
 	unit_state.current_health = 2
 	unit_state.current_ap = 0
-	unit_state.grid_position = GridCoordinate.new(Vector2i(1, 2))
 	unit_state.arts[0].current_cooldown = 3
 
 	suite.assert_int_equal(
@@ -234,13 +233,20 @@ static func _test_definition_state_separation(suite: TestSuite) -> void:
 			"Run relic state must not share the Hero Definition array."
 	)
 
-	var battle_state: BattleState = BattleState.new()
-	battle_state.units.append(unit_state)
+	var battle_grid: GridState = GridState.create(2, 2, fixture.terrain)
+	var battle_state: BattleState = BattleState.create(battle_grid)
+	var placement: BattlePlacementResult = BattlePlacementService.new().place_unit_definition(
+			battle_state,
+			fixture.unit,
+			GameEnums.BattleSide.PLAYER,
+			Vector2i.ZERO
+	)
 	battle_state.phase = GameEnums.BattlePhase.PLAYER_TURN
 	battle_state.round_number = 1
+	suite.assert_true(placement.succeeded(), "Valid Battle Units must be placeable.")
 	suite.assert_int_equal(
 			1,
-			battle_state.units.size(),
+			battle_state.unit_count(),
 			"BattleState must own Battle UnitState references."
 	)
 	suite.assert_false(unit_state.is_defeated(), "Positive health Units must remain active.")

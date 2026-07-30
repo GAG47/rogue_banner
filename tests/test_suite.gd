@@ -33,5 +33,11 @@ func assert_vector_equal(
 		failures.append("%s Expected %s, received %s." % [message, expected, actual])
 
 
+func assert_not_same(expected: Object, actual: Object, message: String) -> void:
+	assertion_count += 1
+	if expected == actual:
+		failures.append(message)
+
+
 func passed() -> bool:
 	return failures.is_empty()

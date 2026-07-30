@@ -39,6 +39,19 @@ set contains:
 Other types in this inventory remain planned contracts and must not be treated
 as implemented APIs.
 
+## Battle Kernel v2
+
+Implemented v2 contracts are recorded in `docs/battle_kernel.md`. The
+implemented set adds:
+
+- `CellState`, `GridOccupant`, `GridState`, and typed Grid operation results
+- `GridPathfinder` and `GridPathResult`
+- Battle-local Unit identity and Run source identity
+- `BattlePlacementService` and `BattleTurnService`
+- Move, Use Art, and End Turn action requests
+- Action validation, execution plans, execution results, and
+  `BattleActionService`
+
 ## Enums
 
 | Type | Responsibility |
@@ -86,14 +99,14 @@ or any other per-run mutable value.
 
 | Type | Authoritative data |
 | --- | --- |
-| `UnitState` | Definition reference, health, AP, position, installed Arts, Buffs, and defeat state |
+| `UnitState` | Battle-local identity, source Run identity, Definition, health, AP, side, installed Arts, and defeat state |
 | `RunUnitState` | Run-owned Unit health and installed Art references without Battle state |
 | `ArtState` | Art definition reference, upgrade variant, cooldown, and per-battle usage state |
 | `BuffState` | Buff definition reference, source, stacks, and remaining duration |
 | `GridState` | Bounds, cells, terrain references, and occupancy |
-| `CellState` | Coordinate, terrain, occupant, and runtime interaction state |
+| `CellState` | Coordinate and terrain; occupancy remains exclusively in Grid State |
 | `TurnState` | Round, active side, phase, and acting order |
-| `BattleState` | Units, Grid state, Turn state, pending triggers, and terminal outcome |
+| `BattleState` | Grid, Battle-local Units, phase, active side, round, and Unit ID allocation |
 | `IntentPlan` | Intent kind, actor, execution data, and authoritative preview data |
 | `TeamState` | Owned units and their between-battle configuration |
 | `RelicState` | Relic definition and per-run trigger or charge state |
@@ -140,7 +153,7 @@ are implemented only when required by the current system phase.
 | `ExecuteIntentActionRequest` | Authoritative intent plan selected for execution |
 | `ActionValidationResult` | Success or typed rejection with explanation data |
 | `ActionExecutionPlan` | Fully validated costs, targets, and ordered effects |
-| `ActionResult` | Committed changes, emitted events, and resulting battle phase |
+| `ActionExecutionResult` | Committed changes and resulting Battle phase |
 | `BattleOutcome` | Victory, failure, rewards context, and surviving unit results |
 
 An execution plan is not a second state store. It is short-lived immutable data

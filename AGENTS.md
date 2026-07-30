@@ -11,6 +11,8 @@ This file applies to the entire repository. More detailed rules are defined in:
 - `docs/development_rules.md`
 - `docs/architecture.md`
 - `docs/core_types.md`
+- `docs/data_model.md`
+- `docs/battle_kernel.md`
 - `docs/development_roadmap.md`
 
 ## Language and Naming
@@ -93,4 +95,3 @@ Stop implementation and report the architectural conflict when a request would
 create duplicate sources of truth, require many special cases, touch several
 unrelated systems for a small feature, or cannot be expressed through existing
 interfaces without violating their responsibilities.
-

@@ -4,9 +4,11 @@ extends SceneTree
 func _init() -> void:
 	var suite: TestSuite = TestSuite.new()
 	CoreDataLayerTest.run(suite)
+	GridStateTest.run(suite)
+	BattleKernelTest.run(suite)
 
 	if suite.passed():
-		print("PASS: %d core data layer assertions." % suite.assertion_count)
+		print("PASS: %d project assertions." % suite.assertion_count)
 		suite = null
 		quit(0)
 		return
@@ -14,7 +16,7 @@ func _init() -> void:
 	for failure: String in suite.failures:
 		push_error(failure)
 	print(
-			"FAIL: %d of %d core data layer assertions failed."
+			"FAIL: %d of %d project assertions failed."
 			% [suite.failures.size(), suite.assertion_count]
 	)
 	suite = null

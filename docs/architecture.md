@@ -109,8 +109,8 @@ cycle with a global manager.
 | Data | Authoritative owner | Consumers |
 | --- | --- | --- |
 | Authored base stats and capabilities | Definition Resources | Runtime state constructors and rules |
-| Current health, AP, cooldowns, buffs, and position | Battle runtime state | Battle, rules, intents, and read models |
-| Cell terrain and occupancy | Grid state | Movement, targeting, and battle validation |
+| Current health, AP, cooldowns, and buffs | Battle Unit state | Battle, rules, intents, and read models |
+| Unit positions, Cell terrain, and occupancy | Grid state | Movement, targeting, and battle validation |
 | Current phase and active side | Turn state | Action validation, AI, and UI read models |
 | Installed arts | Unit runtime state | Art validation and read models |
 | Generated enemy action | Intent plan | Preview and execution |
@@ -137,6 +137,9 @@ serve as identifiers.
 Battle-owned `UnitState` and Run-owned `RunUnitState` are separate runtime
 types. Run state never retains Battle AP, cooldown, side, or grid position, and
 Battle never mutates the Run team directly.
+
+`GridState` is the only authority for Unit and scene object positions.
+`UnitState` and `CellState` do not store duplicate occupancy or position data.
 
 ## Scene and Script Responsibilities
 

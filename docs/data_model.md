@@ -7,6 +7,10 @@ and Run state, rule contracts, and configuration validation. It contains no UI,
 scene, map, reward, shop, enemy decision, movement, damage, or concrete content
 behavior.
 
+Battle kernel v2 extends this model with authoritative Grid occupancy,
+Battle-local Unit identity, placement, pathfinding, actions, and turn state. The
+final v2 contracts are detailed in `docs/battle_kernel.md`.
+
 All Definition types are Godot `Resource` classes registered with `class_name`.
 All runtime State types are `RefCounted` classes created uniquely for a Run or
 Battle.
@@ -146,15 +150,18 @@ Occupancy and runtime interaction state do not belong to this Resource.
 `UnitState` is Battle-owned and contains:
 
 - Runtime `instance_id`
+- Optional source Run Unit ID
 - `UnitDefinition` reference
 - `GameEnums.BattleSide`
 - Current health and AP
-- Optional `GridCoordinate`
 - Unique `ArtState` instances
 
 `UnitState.create` initializes current health and AP from the Unit Definition and
 creates fresh Art State for each valid default Art. It never mutates the source
 Definition.
+
+Unit position is not stored in Unit State. It is queried from the authoritative
+Grid occupancy table.
 
 ### RunUnitState
 
@@ -166,9 +173,9 @@ contains:
 - Between-Battle current health
 - A copied array of installed `ArtDefinition` references
 
-It does not contain Battle AP, cooldowns, side, or grid position. A future Battle
-setup boundary will create Battle-owned Unit State from Run-owned Unit State and
-will return an explicit Battle outcome.
+It does not contain Battle AP, cooldowns, side, or grid position.
+`UnitState.create_from_run_unit` creates independent Battle state and retains
+the source Run Unit ID for a future explicit Battle outcome.
 
 ### ScrollStackState
 
@@ -178,16 +185,18 @@ Definition mutation.
 
 ### BattleState
 
-Battle State v1 contains:
+Battle State v2 contains:
 
+- Grid State
 - Battle phase
 - Active side
 - Round number
-- Battle-owned Unit State references
+- Battle-owned Unit State indexed by Battle-local ID
+- A monotonic Battle-local Unit ID allocator
 
-It is currently a data container only. Turn transitions, Grid ownership,
-actions, effects, defeat resolution, and outcomes belong to the Battle kernel
-phase.
+Grid State owns all positions and occupancy. Battle State owns Unit identity and
+combat values. Action and turn services mutate these owners only through their
+explicit APIs.
 
 ### RunState
 
@@ -287,4 +296,6 @@ The headless test runner verifies:
 - Run and Battle Unit state separation
 - Typed rule result and target value objects
 - Godot Resource save and load round trips
-
+- Grid topology, Terrain, occupancy, and pathfinding
+- Run-to-Battle Unit creation and Battle-local ID allocation
+- Movement actions, AP costs, atomic failures, and turn transitions
