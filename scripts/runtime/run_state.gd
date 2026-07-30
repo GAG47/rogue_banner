@@ -14,14 +14,20 @@ static func create(hero: HeroDefinition, seed: int) -> RunState:
 	state.hero_definition = hero
 	state.run_seed = seed
 
-	if hero == null:
-		return state
+	if hero == null or not DefinitionValidator.new().validate(hero).is_valid():
+		return null
 
 	var next_unit_instance_id: int = 1
 	for unit_definition: UnitDefinition in hero.starting_units:
 		if unit_definition == null:
 			continue
-		state.team.append(RunUnitState.create(next_unit_instance_id, unit_definition))
+		var run_unit: RunUnitState = RunUnitState.create(
+				next_unit_instance_id,
+				unit_definition
+		)
+		if run_unit == null:
+			return null
+		state.team.append(run_unit)
 		next_unit_instance_id += 1
 
 	for relic_definition: RelicDefinition in hero.starting_relics:

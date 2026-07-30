@@ -61,7 +61,7 @@ func _plan_one(
 		return null
 	for target_id: int in plan.target_unit_ids:
 		var target: UnitState = context.battle.get_unit(target_id)
-		if target == null or target.is_defeated():
+		if target == null:
 			return null
 
 	if definition is ScaledUnitEffectDefinition:

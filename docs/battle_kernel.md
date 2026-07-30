@@ -176,8 +176,9 @@ successful placement with only one half committed.
 
 ## Turn Lifecycle
 
-`BattleTurnService.start_battle` transitions setup to round one of the player
-turn.
+`BattleActionService.start_battle` transitions setup to round one of the player
+turn through the same transaction and event-processing boundary used by later
+actions. `BattleTurnService` owns only the internal state transition.
 
 Turn order is:
 
@@ -190,6 +191,7 @@ Player turn
 
 At the start of a side's turn, every living Unit on that side:
 
+- Receives a typed `TurnStartedEvent`
 - Restores AP to its Unit Definition maximum
 - Decrements each positive Art cooldown by one
 
@@ -228,13 +230,14 @@ Successful validation produces an `ActionExecutionPlan` containing the
 authoritative path and AP cost.
 
 Move execution rechecks the state needed for commit, moves the Grid occupant,
-and then spends AP. If the Grid commit fails, AP is not spent.
+and then spends AP inside an isolated Battle transaction.
 
 ## End Turn Action
 
 End Turn validates the requesting side through the same action service. A
-successful request delegates to `BattleTurnService`, refreshes the new active
-side, and returns the resulting phase, side, and round in
+successful request delegates to the internal turn transition, publishes
+`TurnEndedEvent` and `TurnStartedEvent`, refreshes the new active side, processes
+passives, and returns the resulting phase, side, and round in
 `ActionExecutionResult`.
 
 ## Use Art Boundary
@@ -257,12 +260,19 @@ The final Use Art contract is recorded in `docs/art_effect_system.md`.
 
 ## Atomicity
 
-Predictable validation occurs before mutation.
+Predictable validation occurs before execution. Every Battle start and action
+then executes against a deep working state owned by `BattleTransaction`.
+Successful execution copies the final state into the existing authoritative
+Battle, Grid, Unit, Art, and Buff objects. Any internal effect, passive, event,
+turn-transition, cleanup, or resolution failure discards the working state.
 
 - Failed placement does not add a Unit or occupant.
 - Failed movement does not change occupancy or AP.
 - Failed End Turn does not change phase, side, round, AP, or cooldown.
 - Rejected Art execution does not change AP or cooldown.
+- Failed Art or passive execution does not retain damage, Buffs, cooldowns,
+  defeat cleanup, terminal phase, or event sequence changes.
+- Failed initial turn processing leaves the Battle in setup.
 - Unit removal clears occupancy before unregistering Unit State.
 
 UI and enemy decision systems must submit requests to the action service. They

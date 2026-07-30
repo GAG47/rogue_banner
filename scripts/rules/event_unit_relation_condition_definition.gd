@@ -19,6 +19,32 @@ func validate_configuration(
 		)
 
 
+func validate_context(
+		context_kind: GameEnums.ConditionContextKind,
+		event_kind: GameEnums.BattleEventKind,
+		result: DefinitionValidationResult,
+		field_path: StringName
+) -> void:
+	if context_kind != GameEnums.ConditionContextKind.EVENT_TRIGGER:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				field_path,
+				"Event Unit relations require an event-trigger context."
+		)
+		return
+	var capability: GameEnums.EventDataCapability = (
+			GameEnums.EventDataCapability.SOURCE_UNIT
+	)
+	if event_unit_role == GameEnums.EventUnitRole.TARGET:
+		capability = GameEnums.EventDataCapability.TARGET_UNIT
+	if not BattleEventSchema.supports(event_kind, capability):
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				field_path,
+				"The selected event does not provide the required Unit role."
+		)
+
+
 func evaluate(context: ConditionContext) -> ConditionResult:
 	var battle_context: BattleConditionContext = context as BattleConditionContext
 	if (
@@ -40,4 +66,3 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 	if _relation_evaluator.matches(owner, event_unit, relation):
 		return ConditionResult.success()
 	return ConditionResult.failure()
-

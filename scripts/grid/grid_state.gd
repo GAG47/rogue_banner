@@ -241,5 +241,48 @@ func occupant_count() -> int:
 	return _occupants.size()
 
 
+func duplicate_state() -> GridState:
+	var state: GridState = GridState.new()
+	state._width = _width
+	state._height = _height
+	for cell: CellState in _cells:
+		state._cells.append(
+				CellState.new(cell.coordinate, cell.terrain)
+				if cell != null
+				else null
+		)
+	for coordinate: Vector2i in _occupants:
+		var occupant: GridOccupant = _occupants[coordinate]
+		state._occupants[coordinate] = GridOccupant.new(
+				occupant.kind,
+				occupant.runtime_id
+		)
+	return state
+
+
+func _copy_from(source: GridState) -> bool:
+	if (
+		source == null
+		or not source.is_valid()
+		or _width != source.width
+		or _height != source.height
+	):
+		return false
+	for index: int in range(_cells.size()):
+		if _cells[index] == null or source._cells[index] == null:
+			return false
+	for index: int in range(_cells.size()):
+		_cells[index]._replace_terrain(source._cells[index].terrain)
+
+	_occupants.clear()
+	for coordinate: Vector2i in source._occupants:
+		var occupant: GridOccupant = source._occupants[coordinate]
+		_occupants[coordinate] = GridOccupant.new(
+				occupant.kind,
+				occupant.runtime_id
+		)
+	return true
+
+
 func _cell_index(coordinate: Vector2i) -> int:
 	return coordinate.y * _width + coordinate.x

@@ -14,7 +14,8 @@ var _movement_service: BattleMovementService
 
 func _init(
 		pathfinder: GridPathfinder = null,
-		turn_service: BattleTurnService = null
+		turn_service: BattleTurnService = null,
+		event_processor: BattleEventProcessor = null
 ) -> void:
 	_pathfinder = pathfinder
 	if _pathfinder == null:
@@ -38,11 +39,13 @@ func _init(
 			buff_service,
 			_movement_service
 	)
-	_event_processor = BattleEventProcessor.new(
-			_condition_evaluator,
-			_effect_planner,
-			_effect_executor
-	)
+	_event_processor = event_processor
+	if _event_processor == null:
+		_event_processor = BattleEventProcessor.new(
+				_condition_evaluator,
+				_effect_planner,
+				_effect_executor
+		)
 	_resolution_service = BattleResolutionService.new()
 
 
@@ -78,23 +81,75 @@ func execute(
 	if not validation.is_valid:
 		return ActionExecutionResult.failure(validation.failure_code)
 
-	if request is MoveActionRequest:
-		return _execute_move(
-				battle,
-				request as MoveActionRequest,
-				validation.plan
+	var transaction: BattleTransaction = BattleTransaction.begin(battle)
+	if transaction == null or transaction.working_state == null:
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.INVALID_BATTLE
 		)
-	if request is EndTurnActionRequest:
-		return _execute_end_turn(battle, request as EndTurnActionRequest)
-	if request is UseArtActionRequest:
-		return _execute_use_art(
-				battle,
-				request as UseArtActionRequest,
-				validation.plan
-		)
-	return ActionExecutionResult.failure(
-			GameEnums.ActionFailureCode.UNSUPPORTED_ACTION
+	var working_validation: ActionValidationResult = validate(
+			transaction.working_state,
+			request
 	)
+	if not working_validation.is_valid:
+		return ActionExecutionResult.failure(working_validation.failure_code)
+
+	var result: ActionExecutionResult
+	if request is MoveActionRequest:
+		result = _execute_move(
+				transaction.working_state,
+				request as MoveActionRequest,
+				working_validation.plan
+		)
+	elif request is EndTurnActionRequest:
+		result = _execute_end_turn(
+				transaction.working_state,
+				request as EndTurnActionRequest
+		)
+	elif request is UseArtActionRequest:
+		result = _execute_use_art(
+				transaction.working_state,
+				request as UseArtActionRequest,
+				working_validation.plan
+		)
+	else:
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.UNSUPPORTED_ACTION
+		)
+	if not result.is_successful:
+		return result
+	if not transaction.commit():
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.STATE_CHANGED
+		)
+	return result
+
+
+func start_battle(battle: BattleState) -> ActionExecutionResult:
+	if battle == null or battle.grid == null or not battle.grid.is_valid():
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.INVALID_BATTLE
+		)
+	var transaction: BattleTransaction = BattleTransaction.begin(battle)
+	if transaction == null or transaction.working_state == null:
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.INVALID_BATTLE
+		)
+	var transition: TurnTransitionResult = _turn_service._start_battle(
+			transaction.working_state
+	)
+	if not transition.succeeded:
+		return ActionExecutionResult.failure(transition.failure_code)
+	var result: ActionExecutionResult = _process_events_and_resolve(
+			transaction.working_state,
+			transition.events
+	)
+	if not result.is_successful:
+		return result
+	if not transaction.commit():
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.STATE_CHANGED
+		)
+	return result
 
 
 func _validate_move(
@@ -220,10 +275,15 @@ func _validate_use_art(
 			art_definition,
 			target_result.resolved_targets
 	)
-	if not _condition_evaluator.evaluate_all(
+	var condition_result: ConditionResult = _condition_evaluator.evaluate_all(
 			art_definition.use_conditions,
 			condition_context
-	).passed():
+	)
+	if condition_result.status == GameEnums.ConditionStatus.INVALID_CONTEXT:
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.CONDITION_CONTEXT_INVALID
+		)
+	if not condition_result.passed():
 		return ActionValidationResult.rejected(
 				GameEnums.ActionFailureCode.CONDITION_FAILED
 		)
@@ -311,22 +371,13 @@ func _execute_end_turn(
 		battle: BattleState,
 		request: EndTurnActionRequest
 ) -> ActionExecutionResult:
-	var previous_side: GameEnums.BattleSide = battle.active_side
-	var previous_round: int = battle.round_number
-	var transition: TurnTransitionResult = _turn_service.end_turn(
+	var transition: TurnTransitionResult = _turn_service._end_turn(
 			battle,
 			request.requesting_side
 	)
 	if not transition.succeeded:
 		return ActionExecutionResult.failure(transition.failure_code)
-	var events: Array[BattleEvent] = [
-		TurnEndedEvent.create(previous_side, previous_round),
-	]
-	events.append_array(transition.events)
-	events.append(
-			TurnStartedEvent.create(battle.active_side, battle.round_number)
-	)
-	return _process_events_and_resolve(battle, events)
+	return _process_events_and_resolve(battle, transition.events)
 
 
 func _execute_use_art(

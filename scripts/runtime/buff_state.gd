@@ -20,3 +20,19 @@ static func create(
 	if buff_definition != null:
 		state.remaining_turns = buff_definition.duration_turns
 	return state
+
+
+func duplicate_state() -> BuffState:
+	var state: BuffState = BuffState.new()
+	state._copy_from(self)
+	return state
+
+
+func _copy_from(source: BuffState) -> void:
+	if source == null:
+		return
+	instance_id = source.instance_id
+	definition = source.definition
+	source_unit_id = source.source_unit_id
+	stacks = source.stacks
+	remaining_turns = source.remaining_turns

@@ -7,9 +7,20 @@ class TriggerActivationCounter:
 	extends RefCounted
 
 	var owner_unit_id: int = 0
-	var source_order: int = 0
-	var trigger: TriggerDefinition
+	var source_kind: GameEnums.TriggerSourceKind = GameEnums.TriggerSourceKind.ART
+	var source_instance_id: int = 0
+	var trigger_index: int = 0
 	var count: int = 0
+
+
+class TriggerBinding:
+	extends RefCounted
+
+	var owner_unit_id: int = 0
+	var source_kind: GameEnums.TriggerSourceKind = GameEnums.TriggerSourceKind.ART
+	var source_instance_id: int = 0
+	var trigger_index: int = 0
+	var trigger: TriggerDefinition
 
 
 var _condition_evaluator: ConditionEvaluator
@@ -54,81 +65,47 @@ func process(
 					processed
 			)
 		var event: BattleEvent = pending.pop_front()
-		if event == null or not battle._stamp_event(event):
+		if (
+			not BattleEventSchema.is_valid_event(event)
+			or not battle._stamp_event(event)
+		):
 			return BattleEventProcessResult.failure(
 					GameEnums.ActionFailureCode.EFFECT_EXECUTION_FAILED,
 					processed
 			)
 		processed.append(event)
 
-		for owner: UnitState in battle.get_units():
-			if owner == null or owner.is_defeated():
+		var bindings: Array[TriggerBinding] = _collect_trigger_bindings(battle)
+		for binding: TriggerBinding in bindings:
+			if not _is_binding_active(battle, binding):
 				continue
-			var source_order: int = 0
-			for art_state: ArtState in owner.arts:
-				if (
-					art_state == null
-					or art_state.definition == null
-					or art_state.definition.category
-					!= GameEnums.ArtCategory.PASSIVE
-				):
-					source_order += 1
-					continue
-				for trigger: TriggerDefinition in art_state.definition.passive_triggers:
-					var trigger_result: BattleEventProcessResult = (
-						_process_trigger(
-								battle,
-								owner,
-								trigger,
-								source_order,
-								event,
-								counters
-						)
-					)
-					if not trigger_result.succeeded:
-						trigger_result.events.assign(processed)
-						return trigger_result
-					pending.append_array(trigger_result.events)
-					source_order += 1
-
-			for buff: BuffState in owner.get_buffs():
-				if buff == null or buff.definition == null:
-					continue
-				for trigger: TriggerDefinition in buff.definition.passive_triggers:
-					var buff_trigger_result: BattleEventProcessResult = (
-						_process_trigger(
-								battle,
-								owner,
-								trigger,
-								source_order,
-								event,
-								counters
-						)
-					)
-					if not buff_trigger_result.succeeded:
-						buff_trigger_result.events.assign(processed)
-						return buff_trigger_result
-					pending.append_array(buff_trigger_result.events)
-					source_order += 1
+			var trigger_result: BattleEventProcessResult = _process_trigger(
+					battle,
+					binding,
+					event,
+					counters
+			)
+			if not trigger_result.succeeded:
+				trigger_result.events.assign(processed)
+				return trigger_result
+			pending.append_array(trigger_result.events)
 
 	return BattleEventProcessResult.success(processed)
 
 
 func _process_trigger(
 		battle: BattleState,
-		owner: UnitState,
-		trigger: TriggerDefinition,
-		source_order: int,
+		binding: TriggerBinding,
 		event: BattleEvent,
 		counters: Array[TriggerActivationCounter]
 ) -> BattleEventProcessResult:
+	var owner: UnitState = battle.get_unit(binding.owner_unit_id)
+	var trigger: TriggerDefinition = binding.trigger
 	if trigger == null or trigger.event_kind != event.kind:
 		return BattleEventProcessResult.success([])
 	var counter: TriggerActivationCounter = _find_counter(
 			counters,
-			owner.instance_id,
-			source_order,
-			trigger
+			binding
 	)
 	if counter.count >= trigger.maximum_triggers_per_action:
 		return BattleEventProcessResult.success([])
@@ -145,6 +122,10 @@ func _process_trigger(
 			trigger.conditions,
 			context
 	)
+	if condition_result.status == GameEnums.ConditionStatus.INVALID_CONTEXT:
+		return BattleEventProcessResult.failure(
+				GameEnums.ActionFailureCode.CONDITION_CONTEXT_INVALID
+		)
 	if not condition_result.passed():
 		return BattleEventProcessResult.success([])
 
@@ -179,20 +160,129 @@ func _process_trigger(
 
 func _find_counter(
 		counters: Array[TriggerActivationCounter],
-		owner_unit_id: int,
-		source_order: int,
-		trigger: TriggerDefinition
+		binding: TriggerBinding
 ) -> TriggerActivationCounter:
 	for counter: TriggerActivationCounter in counters:
 		if (
-			counter.owner_unit_id == owner_unit_id
-			and counter.source_order == source_order
-			and counter.trigger == trigger
+			counter.owner_unit_id == binding.owner_unit_id
+			and counter.source_kind == binding.source_kind
+			and counter.source_instance_id == binding.source_instance_id
+			and counter.trigger_index == binding.trigger_index
 		):
 			return counter
 	var counter: TriggerActivationCounter = TriggerActivationCounter.new()
-	counter.owner_unit_id = owner_unit_id
-	counter.source_order = source_order
-	counter.trigger = trigger
+	counter.owner_unit_id = binding.owner_unit_id
+	counter.source_kind = binding.source_kind
+	counter.source_instance_id = binding.source_instance_id
+	counter.trigger_index = binding.trigger_index
 	counters.append(counter)
 	return counter
+
+
+func _collect_trigger_bindings(
+		battle: BattleState
+) -> Array[TriggerBinding]:
+	var bindings: Array[TriggerBinding] = []
+	for owner: UnitState in battle.get_units():
+		if owner == null or owner.is_defeated():
+			continue
+		for slot_index: int in range(owner.arts.size()):
+			var art_state: ArtState = owner.arts[slot_index]
+			if (
+				art_state == null
+				or art_state.definition == null
+				or art_state.definition.category
+				!= GameEnums.ArtCategory.PASSIVE
+			):
+				continue
+			for trigger_index: int in range(
+				art_state.definition.passive_triggers.size()
+			):
+				bindings.append(
+						_create_binding(
+								owner.instance_id,
+								GameEnums.TriggerSourceKind.ART,
+								slot_index,
+								trigger_index,
+								art_state.definition.passive_triggers[
+									trigger_index
+								]
+						)
+				)
+		for buff: BuffState in owner.get_buffs():
+			if buff == null or buff.definition == null:
+				continue
+			for trigger_index: int in range(
+				buff.definition.passive_triggers.size()
+			):
+				bindings.append(
+						_create_binding(
+								owner.instance_id,
+								GameEnums.TriggerSourceKind.BUFF,
+								buff.instance_id,
+								trigger_index,
+								buff.definition.passive_triggers[trigger_index]
+						)
+				)
+	return bindings
+
+
+func _create_binding(
+		owner_unit_id: int,
+		source_kind: GameEnums.TriggerSourceKind,
+		source_instance_id: int,
+		trigger_index: int,
+		trigger: TriggerDefinition
+) -> TriggerBinding:
+	var binding: TriggerBinding = TriggerBinding.new()
+	binding.owner_unit_id = owner_unit_id
+	binding.source_kind = source_kind
+	binding.source_instance_id = source_instance_id
+	binding.trigger_index = trigger_index
+	binding.trigger = trigger
+	return binding
+
+
+func _is_binding_active(
+		battle: BattleState,
+		binding: TriggerBinding
+) -> bool:
+	if battle == null or binding == null:
+		return false
+	var owner: UnitState = battle.get_unit(binding.owner_unit_id)
+	if owner == null or owner.is_defeated():
+		return false
+	if binding.source_kind == GameEnums.TriggerSourceKind.ART:
+		if (
+			binding.source_instance_id < 0
+			or binding.source_instance_id >= owner.arts.size()
+		):
+			return false
+		var art_state: ArtState = owner.arts[binding.source_instance_id]
+		return (
+				art_state != null
+				and art_state.definition != null
+				and binding.trigger_index >= 0
+				and binding.trigger_index
+				< art_state.definition.passive_triggers.size()
+				and art_state.definition.passive_triggers[
+					binding.trigger_index
+				] == binding.trigger
+		)
+
+	var buff: BuffState = _find_buff(owner, binding.source_instance_id)
+	return (
+			buff != null
+			and buff.definition != null
+			and binding.trigger_index >= 0
+			and binding.trigger_index < buff.definition.passive_triggers.size()
+			and buff.definition.passive_triggers[binding.trigger_index]
+			== binding.trigger
+	)
+
+
+func _find_buff(owner: UnitState, buff_instance_id: int) -> BuffState:
+	for buff: BuffState in owner.get_buffs():
+		if buff != null and buff.instance_id == buff_instance_id:
+			return buff
+	return null

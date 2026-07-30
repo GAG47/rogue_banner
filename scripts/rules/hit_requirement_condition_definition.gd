@@ -23,6 +23,20 @@ func validate_configuration(
 		)
 
 
+func validate_context(
+		context_kind: GameEnums.ConditionContextKind,
+		_event_kind: GameEnums.BattleEventKind,
+		result: DefinitionValidationResult,
+		field_path: StringName
+) -> void:
+	if context_kind != GameEnums.ConditionContextKind.ACTION_USE:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				field_path,
+				"Hit requirements require a spatial action-use context."
+		)
+
+
 func evaluate(context: ConditionContext) -> ConditionResult:
 	var battle_context: BattleConditionContext = context as BattleConditionContext
 	if battle_context == null or battle_context.resolved_targets == null:
@@ -33,4 +47,3 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 	):
 		return ConditionResult.success()
 	return ConditionResult.failure()
-

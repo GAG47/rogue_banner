@@ -2,12 +2,19 @@ class_name ArtLoadoutService
 extends RefCounted
 
 var _condition_evaluator: ConditionEvaluator
+var _definition_validator: DefinitionValidator
 
 
-func _init(condition_evaluator: ConditionEvaluator = null) -> void:
+func _init(
+		condition_evaluator: ConditionEvaluator = null,
+		definition_validator: DefinitionValidator = null
+) -> void:
 	_condition_evaluator = condition_evaluator
 	if _condition_evaluator == null:
 		_condition_evaluator = ConditionEvaluator.new()
+	_definition_validator = definition_validator
+	if _definition_validator == null:
+		_definition_validator = DefinitionValidator.new()
 
 
 func install(
@@ -36,20 +43,28 @@ func validate_install(
 	_ensure_slot_count(unit)
 	if unit.installed_arts[slot_index] != null:
 		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.SLOT_OCCUPIED)
-	if not _has_required_tags(unit.definition, art):
-		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.MISSING_TAG)
+	return _validate_art_for_slot(unit, art, slot_index)
 
-	var context: ArtInstallConditionContext = ArtInstallConditionContext.create(
-			unit,
-			art,
-			slot_index
-	)
-	if not _condition_evaluator.evaluate_all(
-			art.installation_conditions,
-			context
-	).passed():
-		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.CONDITION_FAILED)
-	return ArtLoadoutResult.success(slot_index, art)
+
+func validate_loadout(unit: RunUnitState) -> ArtLoadoutResult:
+	if unit == null or unit.definition == null:
+		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.INVALID_UNIT)
+	if not _definition_validator.validate(unit.definition).is_valid():
+		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.INVALID_UNIT)
+	if unit.installed_arts.size() > unit.definition.slot_count:
+		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.INVALID_SLOT)
+	for slot_index: int in range(unit.installed_arts.size()):
+		var art: ArtDefinition = unit.installed_arts[slot_index]
+		if art == null:
+			continue
+		var validation: ArtLoadoutResult = _validate_art_for_slot(
+				unit,
+				art,
+				slot_index
+		)
+		if not validation.succeeded():
+			return validation
+	return ArtLoadoutResult.success(-1, null)
 
 
 func remove(unit: RunUnitState, slot_index: int) -> ArtLoadoutResult:
@@ -77,20 +92,38 @@ func upgrade(unit: RunUnitState, slot_index: int) -> ArtLoadoutResult:
 	var upgraded_art: ArtDefinition = current_art.upgraded_variant
 	if upgraded_art == null:
 		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.NO_UPGRADE)
-	if not _has_required_tags(unit.definition, upgraded_art):
-		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.MISSING_TAG)
-	var context: ArtInstallConditionContext = ArtInstallConditionContext.create(
+	var validation: ArtLoadoutResult = _validate_art_for_slot(
 			unit,
 			upgraded_art,
 			slot_index
 	)
-	if not _condition_evaluator.evaluate_all(
-			upgraded_art.installation_conditions,
-			context
-	).passed():
-		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.CONDITION_FAILED)
+	if not validation.succeeded():
+		return validation
 	unit.installed_arts[slot_index] = upgraded_art
 	return ArtLoadoutResult.success(slot_index, upgraded_art)
+
+
+func _validate_art_for_slot(
+		unit: RunUnitState,
+		art: ArtDefinition,
+		slot_index: int
+) -> ArtLoadoutResult:
+	if art == null or not _definition_validator.validate(art).is_valid():
+		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.INVALID_ART)
+	if not _has_required_tags(unit.definition, art):
+		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.MISSING_TAG)
+	var context: ArtInstallConditionContext = ArtInstallConditionContext.create(
+			unit,
+			art,
+			slot_index
+	)
+	var condition_result: ConditionResult = _condition_evaluator.evaluate_all(
+			art.installation_conditions,
+			context
+	)
+	if not condition_result.passed():
+		return ArtLoadoutResult.failure(GameEnums.ArtLoadoutCode.CONDITION_FAILED)
+	return ArtLoadoutResult.success(slot_index, art)
 
 
 func _has_required_tags(

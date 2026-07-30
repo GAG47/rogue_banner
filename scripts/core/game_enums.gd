@@ -117,6 +117,7 @@ enum ActionFailureCode {
 	TRIGGER_LIMIT_EXCEEDED,
 	UNSUPPORTED_ACTION,
 	STATE_CHANGED,
+	CONDITION_CONTEXT_INVALID,
 }
 
 enum TargetRelation {
@@ -164,6 +165,33 @@ enum BattleEventKind {
 enum EventUnitRole {
 	SOURCE,
 	TARGET,
+}
+
+enum EventDataCapability {
+	SOURCE_UNIT = 1,
+	TARGET_UNIT = 2,
+	SIDE = 4,
+	ROUND = 8,
+	ART = 16,
+	BUFF = 32,
+	POSITION = 64,
+	BATTLE_PHASE = 128,
+}
+
+enum ConditionContextKind {
+	ART_INSTALL,
+	ACTION_USE,
+	EVENT_TRIGGER,
+}
+
+enum SideRelation {
+	SAME,
+	OPPOSING,
+}
+
+enum TriggerSourceKind {
+	ART,
+	BUFF,
 }
 
 enum ArtLoadoutCode {

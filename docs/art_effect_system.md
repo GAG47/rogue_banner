@@ -13,6 +13,8 @@ Implemented capabilities:
 - Aim, affected Cell, and hit resolution as separate typed data
 - Target relation, range, duplicate, line-of-sight, and affected-offset validation
 - Composed use and trigger Conditions
+- Event-capability-aware trigger configuration
+- Owning-side and opposing-side turn Conditions
 - Optional minimum-hit Conditions for content that requires a successful hit
 - Damage, healing, shield, movement, Apply Buff, and Remove Buff effects
 - Deterministic attribute modifiers and Buff stacking
@@ -36,12 +38,14 @@ ArtDefinition and BuffDefinition
 
 UseArtActionRequest
 → BattleActionService
-  ├── BattleTargetResolver
-  ├── ConditionEvaluator
-  ├── BattleEffectPlanner
-  ├── BattleEffectExecutor
-  ├── BattleEventProcessor
-  └── BattleResolutionService
+  ├── BattleTransaction
+  └── isolated BattleState
+      ├── BattleTargetResolver
+      ├── ConditionEvaluator
+      ├── BattleEffectPlanner
+      ├── BattleEffectExecutor
+      ├── BattleEventProcessor
+      └── BattleResolutionService
 ```
 
 Definitions contain immutable configuration. `UnitState`, `ArtState`, and
@@ -87,7 +91,8 @@ validator used by execution.
 Definition validation rejects effect contexts that cannot execute: active Arts
 cannot require event targets, Move Arts require exactly one Cell and one Move
 effect, and trigger effects cannot depend on a spatial hit result or selected
-Cell.
+Cell. `BattleEventSchema` also rejects trigger Conditions and effects whose
+required data is not guaranteed by the selected event kind.
 
 ## Conditions
 
@@ -99,6 +104,7 @@ Implemented composition:
 - `AnyConditionDefinition`
 - `NotConditionDefinition`
 - `EventUnitRelationConditionDefinition`
+- `EventSideRelationConditionDefinition`
 - `HitRequirementConditionDefinition`
 
 Battle use Conditions receive `BattleConditionContext`. Installation Conditions
@@ -109,9 +115,18 @@ Event Unit relation Conditions compare a passive owner with the typed event
 source or target through the same self, ally, enemy, or any evaluator used by
 Battle targeting.
 
+Event side relation Conditions compare the owner side with a turn event side.
+They express owning-side and opposing-side turn start or end rules without
+content-specific trigger logic.
+
 Hit requirements inspect the already resolved hit set and can require a minimum
 number of Units, scene objects, or either. They do not repeat occupancy or
 relation logic.
+
+Every Condition declares which context kinds it can consume. Definition
+validation checks installation, action-use, and event-trigger contexts before
+content can enter runtime. Event-trigger validation additionally checks the
+selected event kind's declared payload capabilities.
 
 Concrete factual Conditions are added only when reusable content requirements
 need them. Content-specific checks do not belong in the evaluator.
@@ -191,27 +206,33 @@ typed defeat events remain observable during the action.
 
 Active Art execution follows this order:
 
-1. Validate Battle phase, active side, actor, and placement.
-2. Resolve the installed Art slot.
-3. Reject passive Arts, cooldown, or insufficient AP.
-4. Validate the submitted aim and resolve affected Cells and hits.
-5. Evaluate use Conditions.
-6. Build all effect plans.
-7. Commit AP and cooldown.
-8. Execute ordered effects.
-9. Publish `ArtUsedEvent` after effect events.
-10. Process passive triggers.
-11. Remove defeated Units and resolve victory or failure.
-12. Return typed events and removed Unit IDs.
+1. Validate the request against the authoritative Battle State.
+2. Create an isolated working copy through `BattleTransaction`.
+3. Revalidate and build execution plans against the working copy.
+4. Commit AP and cooldown inside the working copy.
+5. Execute ordered effects inside the working copy.
+6. Publish `ArtUsedEvent` after effect events.
+7. Process the complete passive chain.
+8. Remove defeated Units and resolve victory or failure.
+9. Commit the working state to the authoritative objects only after every step
+   succeeds.
+10. Return typed events and removed Unit IDs.
 
-All predictable content and targeting failures occur before AP or cooldown
-mutation. Execution plans are short-lived commit data and never become another
-runtime state authority.
+Move, Use Art, End Turn, and initial Battle start use this same transaction
+boundary. An internal effect, passive, event, cleanup, or resolution failure
+discards the working copy, so the authoritative Battle remains unchanged.
+Execution plans and transaction copies are short-lived commit data and never
+become additional runtime authorities.
 
 ## Passive Events
 
 `BattleEvent` is the typed event base. `BattleState` assigns monotonic sequence
 IDs as events are processed.
+
+`BattleEventSchema` is the single mapping from each event kind to guaranteed
+payload capabilities such as source Unit, target Unit, side, round, Art, Buff,
+position, or terminal phase. Definition validation and runtime event validation
+both consume this mapping.
 
 Implemented events:
 
@@ -229,8 +250,14 @@ Implemented events:
 
 `BattleEventProcessor` uses a first-in, first-out queue. For each event it scans
 living Units in Battle ID order, then installed passive Arts by slot order, then
-Buffs by runtime order. Each trigger has a per-action activation limit, and an
-event chain is capped at 128 events.
+Buffs by runtime order. Trigger candidates are snapshotted at the start of each
+event. A removed source cannot trigger later in that snapshot, while a source
+added during an event can first observe a later event.
+
+Activation limits use stable source identity: owner Unit ID, Art slot or Buff
+instance ID, and trigger index. Buff insertion, removal, or reordering therefore
+cannot reset or transfer another trigger's counter. Each trigger has a
+per-action activation limit, and an event chain is capped at 128 events.
 
 Passive trigger effects publish new events back into the same queue. There is
 no string event bus and no UI callback inside rule execution.
@@ -253,6 +280,12 @@ It supports:
 
 Upgrade state is represented by the installed variant Definition. No mutable
 upgrade flag is stored in a shared Resource.
+
+Default Arts are installed through the same service used by later Run loadout
+changes. Unit construction fails instead of accepting a default Art that does
+not satisfy its complete Definition, tags, or installation Conditions. Upgrade
+chains and every resulting variant receive complete Definition validation
+before replacement.
 
 ## Battle Resolution
 
@@ -290,12 +323,16 @@ Automated tests cover:
 - Target relations, duplicate selection, range, line of sight, and hit expansion
 - Successful empty-Cell attacks and explicit minimum-hit rejection
 - Condition composition and atomic condition failure
+- Event payload capability and Condition-context validation
+- Owning-side and opposing-side turn Conditions
 - Buff stacking, duration, removal, and attribute calculation
 - Typed Buff expiry events during turn transitions
-- Art installation, removal, tag checks, and upgrades
+- Default Art installation, removal, tag checks, and fully validated upgrades
 - AP spending, cooldown start, and cooldown progress
 - Damage, shield absorption, healing, movement, Apply Buff, and Remove Buff
 - Typed passive events and deterministic sequence IDs
+- Initial turn-start passives and stable Buff trigger identity under mutation
+- Full rollback after internal movement, Art, passive, turn, or start failure
 - Ordered effects after lethal damage
 - Defeated Unit cleanup and terminal Battle phases
 - Debug scene range preview, empty-Cell aiming, and execution through Battle actions

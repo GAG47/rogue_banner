@@ -8,7 +8,10 @@ static func run(suite: TestSuite) -> void:
 	_test_valid_definitions(suite)
 	_test_invalid_definition_data(suite)
 	_test_tag_installation_validation(suite)
+	_test_default_art_installation_validation(suite)
 	_test_upgrade_cycle_validation(suite)
+	_test_upgrade_variant_validation(suite)
+	_test_event_context_validation(suite)
 	_test_rule_contract_values(suite)
 	_test_definition_state_separation(suite)
 	_test_resource_round_trip(suite)
@@ -146,6 +149,32 @@ static func _test_tag_installation_validation(suite: TestSuite) -> void:
 	)
 
 
+static func _test_default_art_installation_validation(
+		suite: TestSuite
+) -> void:
+	var fixture: CoreDataFixture = CoreDataFixture.create()
+	fixture.active_art.installation_conditions.append(
+			FailingConditionDefinition.new()
+	)
+	var result: DefinitionValidationResult = (
+		DefinitionValidator.new().validate(fixture.unit)
+	)
+	suite.assert_true(
+			result.has_code(
+					GameEnums.DefinitionValidationCode.INVALID_INSTALL_CONDITION
+			),
+			"Default Arts should evaluate their installation Conditions."
+	)
+	suite.assert_true(
+			RunUnitState.create(1, fixture.unit) == null,
+			"Invalid default Art loadouts should not create Run Unit state."
+	)
+	suite.assert_true(
+			RunState.create(fixture.hero, 1) == null,
+			"Invalid starting Unit loadouts should reject Run creation."
+	)
+
+
 static func _test_upgrade_cycle_validation(suite: TestSuite) -> void:
 	var first: ArtDefinition = _create_minimal_active_art(&"first_variant")
 	var second: ArtDefinition = _create_minimal_active_art(&"second_variant")
@@ -159,6 +188,123 @@ static func _test_upgrade_cycle_validation(suite: TestSuite) -> void:
 	)
 	first.upgraded_variant = null
 	second.upgraded_variant = null
+
+
+static func _test_upgrade_variant_validation(suite: TestSuite) -> void:
+	var base_art: ArtDefinition = _create_minimal_active_art(&"upgrade_base")
+	var invalid_variant: ArtDefinition = _create_minimal_active_art(
+			&"invalid_upgrade"
+	)
+	invalid_variant.effects.clear()
+	base_art.upgraded_variant = invalid_variant
+	var result: DefinitionValidationResult = (
+		DefinitionValidator.new().validate(base_art)
+	)
+	suite.assert_true(
+			result.has_code(GameEnums.DefinitionValidationCode.MISSING_EFFECT),
+			"Base Art validation should include every configured upgrade variant."
+	)
+
+	base_art.upgraded_variant = null
+	var unit_definition: UnitDefinition = UnitDefinition.new()
+	unit_definition.content_id = &"upgrade_unit"
+	unit_definition.max_health = 5
+	unit_definition.max_ap = 3
+	unit_definition.slot_count = 1
+	var run_unit: RunUnitState = RunUnitState.create(1, unit_definition)
+	var service: ArtLoadoutService = ArtLoadoutService.new()
+	suite.assert_true(
+			service.install(run_unit, base_art, 0).succeeded(),
+			"Valid base Arts should install before an upgrade is configured."
+	)
+	base_art.upgraded_variant = invalid_variant
+	suite.assert_int_equal(
+			GameEnums.ArtLoadoutCode.INVALID_ART,
+			service.upgrade(run_unit, 0).code,
+			"Upgrade execution should fully validate the resulting Art."
+	)
+
+
+static func _test_event_context_validation(suite: TestSuite) -> void:
+	var invalid_effect: ShieldEffectDefinition = ShieldEffectDefinition.new()
+	invalid_effect.target_source = (
+		GameEnums.EffectTargetSource.EVENT_TARGET_UNIT
+	)
+	var missing_unit_trigger: TriggerDefinition = TriggerDefinition.new()
+	missing_unit_trigger.event_kind = GameEnums.BattleEventKind.TURN_STARTED
+	missing_unit_trigger.effects.append(invalid_effect)
+	var missing_unit_result: DefinitionValidationResult = (
+		DefinitionValidationResult.new()
+	)
+	missing_unit_trigger.validate_configuration(
+			missing_unit_result,
+			&"trigger"
+	)
+	suite.assert_false(
+			missing_unit_result.is_valid(),
+			"Turn events should reject effects that require event Units."
+	)
+	var removed_source_trigger: TriggerDefinition = TriggerDefinition.new()
+	removed_source_trigger.event_kind = GameEnums.BattleEventKind.BUFF_REMOVED
+	var removed_source_effect: ShieldEffectDefinition = (
+		ShieldEffectDefinition.new()
+	)
+	removed_source_effect.target_source = (
+		GameEnums.EffectTargetSource.EVENT_SOURCE_UNIT
+	)
+	removed_source_effect.flat_amount = 1
+	removed_source_trigger.effects.append(removed_source_effect)
+	var removed_source_result: DefinitionValidationResult = (
+		DefinitionValidationResult.new()
+	)
+	removed_source_trigger.validate_configuration(
+			removed_source_result,
+			&"trigger"
+	)
+	suite.assert_false(
+			removed_source_result.is_valid(),
+			"Buff removal should reject dependencies on a non-guaranteed source."
+	)
+
+	var unit_relation: EventUnitRelationConditionDefinition = (
+		EventUnitRelationConditionDefinition.new()
+	)
+	var actor_effect: ShieldEffectDefinition = ShieldEffectDefinition.new()
+	actor_effect.target_source = GameEnums.EffectTargetSource.ACTOR
+	actor_effect.flat_amount = 1
+	var invalid_condition_trigger: TriggerDefinition = TriggerDefinition.new()
+	invalid_condition_trigger.event_kind = (
+		GameEnums.BattleEventKind.TURN_ENDED
+	)
+	invalid_condition_trigger.conditions.append(unit_relation)
+	invalid_condition_trigger.effects.append(actor_effect)
+	var invalid_condition_result: DefinitionValidationResult = (
+		DefinitionValidationResult.new()
+	)
+	invalid_condition_trigger.validate_configuration(
+			invalid_condition_result,
+			&"trigger"
+	)
+	suite.assert_false(
+			invalid_condition_result.is_valid(),
+			"Turn events should reject Conditions that require event Units."
+	)
+
+	var side_relation: EventSideRelationConditionDefinition = (
+		EventSideRelationConditionDefinition.new()
+	)
+	var valid_trigger: TriggerDefinition = TriggerDefinition.new()
+	valid_trigger.event_kind = GameEnums.BattleEventKind.TURN_STARTED
+	valid_trigger.conditions.append(side_relation)
+	valid_trigger.effects.append(actor_effect)
+	var valid_result: DefinitionValidationResult = (
+		DefinitionValidationResult.new()
+	)
+	valid_trigger.validate_configuration(valid_result, &"trigger")
+	suite.assert_true(
+			valid_result.is_valid(),
+			"Turn events should accept reusable event-side Conditions."
+	)
 
 
 static func _test_rule_contract_values(suite: TestSuite) -> void:

@@ -46,6 +46,55 @@ func unit_count() -> int:
 	return _units.size()
 
 
+func duplicate_state() -> BattleState:
+	var state: BattleState = BattleState.new()
+	state.grid = grid.duplicate_state() if grid != null else null
+	state.phase = phase
+	state.active_side = active_side
+	state.round_number = round_number
+	state._next_unit_instance_id = _next_unit_instance_id
+	state._next_event_sequence_id = _next_event_sequence_id
+	for unit: UnitState in get_units():
+		state._units[unit.instance_id] = unit.duplicate_state()
+	return state
+
+
+func _commit_from(source: BattleState) -> bool:
+	if (
+		source == null
+		or source.grid == null
+		or grid == null
+		or grid.width != source.grid.width
+		or grid.height != source.grid.height
+	):
+		return false
+	if not grid._copy_from(source.grid):
+		return false
+
+	var source_unit_ids: Dictionary[int, bool] = {}
+	for source_unit: UnitState in source.get_units():
+		source_unit_ids[source_unit.instance_id] = true
+		var existing: UnitState = get_unit(source_unit.instance_id)
+		if existing == null:
+			_units[source_unit.instance_id] = source_unit.duplicate_state()
+		else:
+			existing._copy_from(source_unit)
+
+	var removed_unit_ids: Array[int] = []
+	for unit_id: int in _units:
+		if not source_unit_ids.has(unit_id):
+			removed_unit_ids.append(unit_id)
+	for unit_id: int in removed_unit_ids:
+		_units.erase(unit_id)
+
+	phase = source.phase
+	active_side = source.active_side
+	round_number = source.round_number
+	_next_unit_instance_id = source._next_unit_instance_id
+	_next_event_sequence_id = source._next_event_sequence_id
+	return true
+
+
 func _allocate_unit_id() -> int:
 	var allocated_id: int = _next_unit_instance_id
 	_next_unit_instance_id += 1

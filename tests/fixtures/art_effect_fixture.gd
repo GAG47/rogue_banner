@@ -67,7 +67,7 @@ static func create(with_passive_enemy: bool = false) -> ArtEffectFixture:
 			)
 		)
 		fixture.second_enemy_unit_id = second_enemy.unit_id
-	fixture.turn_service.start_battle(fixture.battle)
+	fixture.action_service.start_battle(fixture.battle)
 	return fixture
 
 

@@ -18,6 +18,21 @@ func validate_configuration(
 		condition.validate_configuration(result, field_path)
 
 
+func validate_context(
+		context_kind: GameEnums.ConditionContextKind,
+		event_kind: GameEnums.BattleEventKind,
+		result: DefinitionValidationResult,
+		field_path: StringName
+) -> void:
+	if condition != null:
+		condition.validate_context(
+				context_kind,
+				event_kind,
+				result,
+				field_path
+		)
+
+
 func evaluate(context: ConditionContext) -> ConditionResult:
 	if context == null or condition == null:
 		return ConditionResult.failure(GameEnums.ConditionStatus.INVALID_CONTEXT)

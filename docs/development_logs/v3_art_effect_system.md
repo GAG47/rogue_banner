@@ -17,6 +17,8 @@ without moving rule ownership into Units, UI, or content-specific scripts.
 - Added Battle and installation Condition contexts plus all, any, and not
   composition.
 - Added reusable event Unit relation Conditions for passive ownership filters.
+- Added event payload capabilities and same-side or opposing-side turn
+  Conditions.
 - Added authoritative Battle target resolution with relation, count, range,
   duplicate, and line-of-sight checks.
 - Separated submitted aim, affected Cells, and occupancy-derived hits through
@@ -30,7 +32,14 @@ without moving rule ownership into Units, UI, or content-specific scripts.
   Conditions, targets, effects, events, and terminal resolution.
 - Added typed Battle events, deterministic event sequence IDs, passive trigger
   processing, trigger limits, and event-chain protection.
+- Added stable trigger identities and per-event source snapshots so Buff
+  mutation cannot reset limits or make trigger counts ambiguous.
 - Added Art installation, removal, and data-driven upgrade variants.
+- Routed default Arts and upgraded variants through complete Definition,
+  installation, and loadout validation.
+- Added `TurnStartedEvent` processing for the first player turn.
+- Added isolated Battle transactions for Battle start, movement, Art use, End
+  Turn, passive chains, defeat cleanup, and terminal resolution.
 - Added defeated Unit cleanup, victory, failure, and `BattleEndedEvent`.
 - Added authored debug Arts and Buff content.
 - Extended the debug Battle scene with Simplified Chinese Art controls,
@@ -48,10 +57,12 @@ without moving rule ownership into Units, UI, or content-specific scripts.
   occupant at the submitted aim Cell.
 - Effects consume resolved hits, while use Conditions can explicitly require a
   minimum hit count.
-- Predictable validation and effect planning finish before AP and cooldown
-  commit.
+- Battle start and actions execute on an isolated working state and commit only
+  after effects, passive chains, cleanup, and resolution all succeed.
 - Passive events use typed objects and a deterministic first-in, first-out
   processor.
+- Event-trigger Conditions and effects are checked against the payload
+  capabilities of their configured event kind.
 - Modifier duration and stacks belong to Buff state, not modifier Definitions.
 - Effects after a lethal effect skip the defeated target and continue action
   resolution.
@@ -83,7 +94,7 @@ branch for any debug content ID.
 
 ## Verification
 
-- All 239 project assertions passed.
+- All 275 project assertions passed.
 - The standalone v3 debug Battle scene loaded and ran headlessly.
 - The Godot headless editor check completed with exit code zero.
 - `git diff --check` passed.

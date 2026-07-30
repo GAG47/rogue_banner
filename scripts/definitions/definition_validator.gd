@@ -154,17 +154,27 @@ func _validate_unit(
 
 	_validate_tags(definition.tags, &"tags", result)
 
+	var default_state: RunUnitState = RunUnitState.create_empty(0, definition)
+	var loadout_service: ArtLoadoutService = ArtLoadoutService.new(null, self)
 	for index: int in range(definition.default_arts.size()):
 		var art: ArtDefinition = definition.default_arts[index]
 		var art_path: StringName = _indexed_path(&"default_arts", index)
 		if not _validate_reference(art, art_path, result):
 			continue
-		_validate_default_art_installation(definition, art, art_path, result)
+		_validate_default_art_installation(
+				default_state,
+				loadout_service,
+				art,
+				index,
+				art_path,
+				result
+		)
 
 
 func _validate_art(
 		definition: ArtDefinition,
-		result: DefinitionValidationResult
+		result: DefinitionValidationResult,
+		validate_upgrade_variants: bool = true
 ) -> void:
 	if definition.ap_cost < 0:
 		result.add_issue(
@@ -183,9 +193,15 @@ func _validate_art(
 	_validate_conditions(
 			definition.installation_conditions,
 			&"installation_conditions",
+			GameEnums.ConditionContextKind.ART_INSTALL,
 			result
 	)
-	_validate_conditions(definition.use_conditions, &"use_conditions", result)
+	_validate_conditions(
+			definition.use_conditions,
+			&"use_conditions",
+			GameEnums.ConditionContextKind.ACTION_USE,
+			result
+	)
 	_validate_effects(
 			definition.effects,
 			&"effects",
@@ -231,9 +247,10 @@ func _validate_art(
 				"Active Arts cannot declare passive triggers."
 		)
 
-	if definition.upgraded_variant != null:
+	if definition.upgraded_variant != null and validate_upgrade_variants:
 		_validate_reference(definition.upgraded_variant, &"upgraded_variant", result)
-		_validate_art_upgrade_chain(definition, result)
+		if _validate_art_upgrade_chain(definition, result):
+			_validate_art_upgrade_variants(definition, result)
 
 
 func _validate_relic(
@@ -262,7 +279,12 @@ func _validate_scroll(
 	else:
 		definition.targeting.validate_configuration(result, &"targeting")
 
-	_validate_conditions(definition.use_conditions, &"use_conditions", result)
+	_validate_conditions(
+			definition.use_conditions,
+			&"use_conditions",
+			GameEnums.ConditionContextKind.ACTION_USE,
+			result
+	)
 	_validate_effects(definition.effects, &"effects", true, result)
 
 
@@ -381,6 +403,7 @@ func _validate_tags(
 func _validate_conditions(
 		conditions: Array[ConditionDefinition],
 		field_path: StringName,
+		context_kind: GameEnums.ConditionContextKind,
 		result: DefinitionValidationResult
 ) -> void:
 	for index: int in range(conditions.size()):
@@ -394,6 +417,12 @@ func _validate_conditions(
 			)
 			continue
 		condition.validate_configuration(result, condition_path)
+		condition.validate_context(
+				context_kind,
+				GameEnums.BattleEventKind.ART_USED,
+				result,
+				condition_path
+		)
 
 
 func _validate_effects(
@@ -493,53 +522,34 @@ func _validate_unique_reference(
 
 
 func _validate_default_art_installation(
-		unit: UnitDefinition,
+		unit: RunUnitState,
+		loadout_service: ArtLoadoutService,
 		art: ArtDefinition,
+		slot_index: int,
 		field_path: StringName,
 		result: DefinitionValidationResult
 ) -> void:
-	for required_tag: TagDefinition in art.required_tags:
-		if required_tag == null or required_tag.content_id == &"":
-			continue
-		if not _unit_has_tag(unit, required_tag):
-			result.add_issue(
-					GameEnums.DefinitionValidationCode.INVALID_INSTALL_CONDITION,
-					field_path,
-					"Default Art tag requirements are not satisfied by the Unit."
-			)
-
-	for index: int in range(art.installation_conditions.size()):
-		var condition: ConditionDefinition = art.installation_conditions[index]
-		var condition_path: StringName = StringName(
-				"%s.installation_conditions[%d]" % [String(field_path), index]
+	var art_result: DefinitionValidationResult = validate(art)
+	_append_prefixed_issues(result, art_result, field_path)
+	if not art_result.is_valid():
+		return
+	var installation: ArtLoadoutResult = loadout_service.install(
+			unit,
+			art,
+			slot_index
+	)
+	if not installation.succeeded():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_INSTALL_CONDITION,
+				field_path,
+				"Default Art installation requirements are not satisfied."
 		)
-		if condition == null:
-			result.add_issue(
-					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
-					condition_path,
-					"Default Art installation conditions cannot be null."
-			)
-			continue
-		condition.validate_configuration(result, condition_path)
-
-
-func _unit_has_tag(unit: UnitDefinition, required_tag: TagDefinition) -> bool:
-	for unit_tag: TagDefinition in unit.tags:
-		if unit_tag == required_tag:
-			return true
-		if (
-				unit_tag != null
-				and unit_tag.content_id != &""
-				and unit_tag.content_id == required_tag.content_id
-		):
-			return true
-	return false
 
 
 func _validate_art_upgrade_chain(
 		definition: ArtDefinition,
 		result: DefinitionValidationResult
-) -> void:
+) -> bool:
 	var seen_instances: Array[int] = []
 	var seen_content_ids: Array[StringName] = []
 	var current: ArtDefinition = definition
@@ -552,7 +562,7 @@ func _validate_art_upgrade_chain(
 					&"upgraded_variant",
 					"Art upgrade variants cannot form a cycle."
 			)
-			return
+			return false
 		seen_instances.append(instance_id)
 
 		if current.content_id != &"":
@@ -562,10 +572,41 @@ func _validate_art_upgrade_chain(
 						&"upgraded_variant",
 						"Art upgrade variants must use distinct content IDs."
 				)
-				return
+				return false
 			seen_content_ids.append(current.content_id)
 
 		current = current.upgraded_variant
+	return true
+
+
+func _validate_art_upgrade_variants(
+		definition: ArtDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	var current: ArtDefinition = definition.upgraded_variant
+	var field_path: StringName = &"upgraded_variant"
+	while current != null:
+		var variant_result: DefinitionValidationResult = (
+			DefinitionValidationResult.new()
+		)
+		_validate_base(current, variant_result)
+		_validate_art(current, variant_result, false)
+		_append_prefixed_issues(result, variant_result, field_path)
+		current = current.upgraded_variant
+		field_path = _child_path(field_path, &"upgraded_variant")
+
+
+func _append_prefixed_issues(
+		target: DefinitionValidationResult,
+		source: DefinitionValidationResult,
+		prefix: StringName
+) -> void:
+	for issue: DefinitionValidationIssue in source.issues:
+		target.add_issue(
+				issue.code,
+				_child_path(prefix, issue.field_path),
+				issue.message
+		)
 
 
 func _child_path(parent: StringName, child: StringName) -> StringName:

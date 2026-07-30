@@ -186,9 +186,10 @@ Current duration, stacks, source Unit, and Battle identity belong to
 - Unique `ArtState` instances
 - Unique `BuffState` instances
 
-`UnitState.create` initializes current health and AP from the Unit Definition and
-creates fresh Art State for each valid default Art. It never mutates the source
-Definition.
+`UnitState.create` initializes current health and AP from a fully validated Unit
+Definition and creates fresh Art State through the same default-loadout rules
+used by Run Units. Construction fails when a default Art is invalid or cannot
+be installed. It never mutates the source Definition.
 
 Unit position is not stored in Unit State. It is queried from the authoritative
 Grid occupancy table.
@@ -211,7 +212,8 @@ contains:
 
 It does not contain Battle AP, cooldowns, side, or grid position.
 `UnitState.create_from_run_unit` creates independent Battle state and retains
-the source Run Unit ID for a future explicit Battle outcome.
+the source Run Unit ID for a future explicit Battle outcome. Both creation paths
+reject an invalid loadout rather than silently importing it into Battle.
 
 ### ScrollStackState
 
@@ -235,6 +237,12 @@ Grid State owns all positions and occupancy. Battle State owns Unit identity and
 combat values. Action and turn services mutate these owners only through their
 explicit APIs.
 
+`BattleTransaction` creates a short-lived deep working copy of Grid, Unit, Art,
+Buff, turn, and allocator state. Battle start and actions execute completely on
+that copy. A successful result is copied back into the existing authoritative
+objects; any internal failure discards it. The working copy is never exposed as
+a second long-lived state source.
+
 ### RunState
 
 Run State v1 contains:
@@ -246,9 +254,11 @@ Run State v1 contains:
 - Owned Relic Definition references
 - Scroll Stack State
 
-`RunState.create` copies the Hero's starting configuration into new mutable
-arrays and new `RunUnitState` objects. Mutating Run inventory or Unit state
-cannot change the Hero, Unit, Art, or Relic Definitions.
+`RunState.create` validates the Hero and every starting Unit loadout, then copies
+the starting configuration into new mutable arrays and new `RunUnitState`
+objects. It fails instead of returning a partially initialized Run. Mutating
+Run inventory or Unit state cannot change the Hero, Unit, Art, or Relic
+Definitions.
 
 ## Rule Contracts
 
@@ -264,9 +274,15 @@ cannot change the Hero, Unit, Art, or Relic Definitions.
 Version 3 adds `BattleConditionContext`, `ArtInstallConditionContext`, a
 stateless `ConditionEvaluator`, reusable all, any, and not composition, and an
 event Unit relation Condition for passive ownership filters.
+`EventSideRelationConditionDefinition` expresses same-side and opposing-side
+turn events relative to the passive owner.
 `HitRequirementConditionDefinition` can explicitly require a minimum number of
 resolved Unit, scene-object, or combined hits. Additional factual Conditions
 are added only when required by reusable content rules.
+
+Conditions validate their supported context kind. Trigger Conditions also
+validate required event payload capabilities through `BattleEventSchema`, so
+configuration cannot assume Unit data on a turn-only event.
 
 ### Effects
 
@@ -309,7 +325,10 @@ the Art declares a hit requirement Condition.
 `TriggerDefinition` binds a typed `BattleEventKind` to Conditions, ordered
 Effects, and a per-action activation limit. `BattleEventProcessor` executes
 passive Art and Buff triggers through a deterministic first-in, first-out event
-queue. Relic runtime binding remains deferred.
+queue. Each event snapshots its candidate sources. Trigger counters use owner
+Unit ID, stable Art slot or Buff instance ID, and trigger index, so Buff
+mutation cannot change trigger identity. Relic runtime binding remains
+deferred.
 
 ## Validation
 
@@ -323,10 +342,11 @@ Definition schema validation. It checks:
 - Targeting bounds
 - Required active effects and passive triggers
 - Unit default Art slot capacity
-- Unit tag compatibility for default Art installation
+- Complete default Art Definition, tag, and installation-condition validity
 - Nested Condition, Effect, Targeting, and Trigger configuration
+- Condition-context and event-payload compatibility
 - Modifier and Buff configuration
-- Art upgrade cycles and repeated upgrade content IDs
+- Complete Art upgrade variants, cycles, and repeated upgrade content IDs
 
 Expected validation failures are returned as
 `DefinitionValidationResult` containing typed `DefinitionValidationIssue`
@@ -352,7 +372,9 @@ The headless test runner verifies:
 - Grid topology, Terrain, occupancy, and pathfinding
 - Run-to-Battle Unit creation and Battle-local ID allocation
 - Movement actions, AP costs, atomic failures, and turn transitions
+- Rollback after internal action, passive, turn, and Battle-start failures
 - Targeting, line of sight, Conditions, modifiers, and Buff lifecycle
-- Art loadouts, upgrades, AP, cooldowns, and ordered effects
+- Default Art loadouts, fully validated upgrades, AP, cooldowns, and ordered effects
 - Damage, healing, shield, movement, Apply Buff, and Remove Buff
-- Typed passive events, defeat cleanup, victory, and failure
+- Typed passive events, event capabilities, stable trigger identity, initial
+  turn-start triggers, defeat cleanup, victory, and failure

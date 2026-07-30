@@ -64,6 +64,8 @@ implemented set adds:
 - Effect planning and execution for damage, healing, shield, movement,
   Apply Buff, and Remove Buff
 - Typed Battle events and deterministic passive trigger processing
+- Event payload schema and context-aware trigger validation
+- Transactional Battle action and initial-turn execution
 - Completed Use Art action execution
 - `ArtLoadoutService` for installation, removal, and upgrade variants
 - Defeat cleanup and terminal Battle resolution
@@ -87,6 +89,10 @@ Types outside the v1, v2, and v3 implemented sets remain planned contracts.
 | `HitTargetKind` | Unit, scene object, or either hit category |
 | `BattleEventKind` | Stable typed Battle event categories |
 | `EventUnitRole` | Source or target Unit in a typed Battle event |
+| `EventDataCapability` | Typed payload facts guaranteed by an event kind |
+| `ConditionContextKind` | Installation, action-use, or event-trigger context |
+| `SideRelation` | Same or opposing side relative to a passive owner |
+| `TriggerSourceKind` | Stable Art or Buff trigger source category |
 | `RewardKind` | Unit, Art, Relic, Scroll, currency, or service |
 | `MapNodeKind` | Battle, elite, boss, shop, camp, chest, or event |
 | `ActionFailureCode` | Stable machine-readable action rejection categories |
@@ -160,10 +166,11 @@ only through its owning command service.
 | `RandomSource` | Seeded random operations supplied to random consumers |
 
 Implemented reusable rule types include Condition composition, event Unit
-relations, Battle target resolution, damage, healing, shield, movement,
-Apply Buff, Remove Buff, attribute modifiers, relative affected-Cell
-footprints, and explicit hit requirements. Forced movement, directional or
-rotated footprints, and additional factual content Conditions remain planned.
+relations, event side relations, Battle target resolution, damage, healing,
+shield, movement, Apply Buff, Remove Buff, attribute modifiers, relative
+affected-Cell footprints, and explicit hit requirements. Forced movement,
+directional or rotated footprints, and additional factual content Conditions
+remain planned.
 
 ## Battle Action Types
 
@@ -177,6 +184,7 @@ rotated footprints, and additional factual content Conditions remain planned.
 | `ActionValidationResult` | Success or typed rejection with explanation data |
 | `ActionExecutionPlan` | Fully validated costs, targets, and ordered effects |
 | `ActionExecutionResult` | Committed changes and resulting Battle phase |
+| `BattleTransaction` | Isolated working Battle State and all-or-nothing commit |
 | `BattleOutcome` | Victory, failure, rewards context, and surviving unit results |
 
 An execution plan is not a second state store. It is short-lived immutable data
@@ -203,6 +211,10 @@ Implemented Battle event families are:
 
 Event names describe completed facts. Events do not grant direct mutable access
 to their source state.
+
+`BattleEventSchema` maps each event kind to guaranteed payload capabilities and
+validates the concrete event payload. Trigger configuration and runtime
+processing share this mapping.
 
 ## Art Types
 

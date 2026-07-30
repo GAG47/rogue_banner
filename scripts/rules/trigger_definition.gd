@@ -42,6 +42,12 @@ func validate_configuration(
 			)
 			continue
 		condition.validate_configuration(result, condition_path)
+		condition.validate_context(
+				GameEnums.ConditionContextKind.EVENT_TRIGGER,
+				event_kind,
+				result,
+				condition_path
+		)
 
 	if effects.is_empty():
 		result.add_issue(
@@ -65,6 +71,32 @@ func validate_configuration(
 					GameEnums.DefinitionValidationCode.INVALID_VALUE,
 					effect_path,
 					"Trigger effects cannot depend on a spatial hit result."
+			)
+		elif (
+			effect.target_source
+			== GameEnums.EffectTargetSource.EVENT_SOURCE_UNIT
+			and not BattleEventSchema.supports(
+					event_kind,
+					GameEnums.EventDataCapability.SOURCE_UNIT
+			)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					effect_path,
+					"The selected event does not provide a source Unit."
+			)
+		elif (
+			effect.target_source
+			== GameEnums.EffectTargetSource.EVENT_TARGET_UNIT
+			and not BattleEventSchema.supports(
+					event_kind,
+					GameEnums.EventDataCapability.TARGET_UNIT
+			)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					effect_path,
+					"The selected event does not provide a target Unit."
 			)
 		if effect is MoveEffectDefinition:
 			result.add_issue(

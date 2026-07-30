@@ -147,5 +147,6 @@ static func failure_code_text(code: GameEnums.ActionFailureCode) -> String:
 			return "当前不支持此类行动"
 		GameEnums.ActionFailureCode.STATE_CHANGED:
 			return "战斗状态已经发生变化"
+		GameEnums.ActionFailureCode.CONDITION_CONTEXT_INVALID:
+			return "条件所需的数据在当前上下文中不存在"
 	return "未知错误"
-

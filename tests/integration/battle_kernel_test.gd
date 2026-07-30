@@ -134,7 +134,7 @@ static func _test_movement_and_ap(suite: TestSuite) -> void:
 			GameEnums.BattleSide.ENEMY,
 			Vector2i(4, 1)
 	)
-	fixture.turn_service.start_battle(fixture.battle)
+	fixture.action_service.start_battle(fixture.battle)
 
 	var move: MoveActionRequest = MoveActionRequest.create(
 			GameEnums.BattleSide.PLAYER,
@@ -183,7 +183,7 @@ static func _test_invalid_actions_are_atomic(suite: TestSuite) -> void:
 			GameEnums.BattleSide.ENEMY,
 			Vector2i(2, 0)
 	)
-	fixture.turn_service.start_battle(fixture.battle)
+	fixture.action_service.start_battle(fixture.battle)
 	var player_state: UnitState = fixture.battle.get_unit(player.unit_id)
 
 	var occupied_move: MoveActionRequest = MoveActionRequest.create(
@@ -274,8 +274,13 @@ static func _test_turn_transitions_and_refresh(suite: TestSuite) -> void:
 	player_state.arts[0].current_cooldown = 2
 	enemy_state.arts[0].current_cooldown = 1
 
-	var start: TurnTransitionResult = fixture.turn_service.start_battle(fixture.battle)
-	suite.assert_true(start.succeeded, "Battle setup must start the player turn.")
+	var start: ActionExecutionResult = fixture.action_service.start_battle(
+			fixture.battle
+	)
+	suite.assert_true(
+			start.is_successful,
+			"Battle setup must start the player turn."
+	)
 	suite.assert_int_equal(1, fixture.battle.round_number, "Battle must start at round one.")
 	suite.assert_int_equal(
 			fixture.core.unit.max_ap,
@@ -360,7 +365,7 @@ static func _test_use_art_entry_is_non_committing(suite: TestSuite) -> void:
 			GameEnums.BattleSide.ENEMY,
 			Vector2i(1, 0)
 	)
-	fixture.turn_service.start_battle(fixture.battle)
+	fixture.action_service.start_battle(fixture.battle)
 
 	var targets: TargetSelection = TargetSelection.new()
 	targets.unit_instance_ids.append(enemy.unit_id)

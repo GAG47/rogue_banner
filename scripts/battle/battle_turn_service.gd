@@ -17,7 +17,7 @@ func _init(
 		_buff_service = BuffService.new(_attribute_calculator)
 
 
-func start_battle(battle: BattleState) -> TurnTransitionResult:
+func _start_battle(battle: BattleState) -> TurnTransitionResult:
 	if battle == null or battle.grid == null or not battle.grid.is_valid():
 		return TurnTransitionResult.failure(GameEnums.ActionFailureCode.INVALID_BATTLE)
 	if battle.phase != GameEnums.BattlePhase.SETUP:
@@ -33,10 +33,13 @@ func start_battle(battle: BattleState) -> TurnTransitionResult:
 			battle.round_number
 	)
 	result.events.assign(_refresh_side(battle, GameEnums.BattleSide.PLAYER))
+	result.events.append(
+			TurnStartedEvent.create(battle.active_side, battle.round_number)
+	)
 	return result
 
 
-func end_turn(
+func _end_turn(
 		battle: BattleState,
 		requesting_side: GameEnums.BattleSide
 ) -> TurnTransitionResult:
@@ -48,6 +51,7 @@ func end_turn(
 		return TurnTransitionResult.failure(GameEnums.ActionFailureCode.WRONG_TURN)
 
 	var previous_side: GameEnums.BattleSide = battle.active_side
+	var previous_round: int = battle.round_number
 	if battle.active_side == GameEnums.BattleSide.PLAYER:
 		battle.active_side = GameEnums.BattleSide.ENEMY
 		battle.phase = GameEnums.BattlePhase.ENEMY_TURN
@@ -61,7 +65,11 @@ func end_turn(
 			battle.active_side,
 			battle.round_number
 	)
-	result.events.assign(_refresh_side(battle, battle.active_side))
+	result.events.append(TurnEndedEvent.create(previous_side, previous_round))
+	result.events.append_array(_refresh_side(battle, battle.active_side))
+	result.events.append(
+			TurnStartedEvent.create(battle.active_side, battle.round_number)
+	)
 	return result
 
 

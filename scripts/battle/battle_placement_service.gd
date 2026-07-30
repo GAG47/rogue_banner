@@ -15,6 +15,10 @@ func place_run_unit(
 		return BattlePlacementResult.failure(
 				GameEnums.BattlePlacementCode.INVALID_UNIT
 		)
+	if not ArtLoadoutService.new().validate_loadout(run_unit).succeeded():
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
 
 	var cell_validation: GridOperationResult = battle.grid.can_place_at(coordinate)
 	if not cell_validation.succeeded():
@@ -22,6 +26,10 @@ func place_run_unit(
 
 	var unit_id: int = battle._allocate_unit_id()
 	var unit: UnitState = UnitState.create_from_run_unit(unit_id, run_unit, side)
+	if unit == null:
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
 	return _commit_placement(battle, unit, coordinate)
 
 
@@ -38,6 +46,10 @@ func place_unit_definition(
 		return BattlePlacementResult.failure(
 				GameEnums.BattlePlacementCode.INVALID_UNIT
 		)
+	if not DefinitionValidator.new().validate(definition).is_valid():
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
 
 	var cell_validation: GridOperationResult = battle.grid.can_place_at(coordinate)
 	if not cell_validation.succeeded():
@@ -45,6 +57,10 @@ func place_unit_definition(
 
 	var unit_id: int = battle._allocate_unit_id()
 	var unit: UnitState = UnitState.create(unit_id, definition, side)
+	if unit == null:
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
 	return _commit_placement(battle, unit, coordinate)
 
 

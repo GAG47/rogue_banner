@@ -214,8 +214,14 @@ condition before requesting effects. There is no untyped global string event
 bus. Event processing order is deterministic and covered by tests.
 
 Battle events use a first-in, first-out queue. Living Units are scanned by
-Battle ID, passive Arts by slot, and Buffs by runtime order. Battle State owns
-monotonic event sequence IDs.
+Battle ID, passive Arts by slot, and Buffs by runtime order. Event kinds declare
+their guaranteed payload capabilities in one schema, and trigger Conditions and
+effects are validated against that schema before runtime.
+
+Trigger candidates are snapshotted per event. Activation identity uses owner,
+stable Art slot or Buff instance, and trigger index, so source-list mutation
+cannot reset limits or make a newly added source observe the event that created
+it. Battle State owns monotonic event sequence IDs.
 
 ### Random Selection
 
@@ -229,17 +235,18 @@ utility.
 Every player, enemy, art, and system action uses one authoritative pipeline:
 
 1. Receive a typed action request.
-2. Resolve the actor and current turn.
-3. Validate phase, ownership, conditions, targets, costs, and cooldowns.
-4. Build an execution plan with all information needed to commit the action.
-5. Commit costs and cooldown changes.
-6. Execute ordered effects.
-7. Publish typed domain events.
-8. Resolve defeats, victory, failure, and follow-up triggers.
+2. Validate the request against authoritative state.
+3. Create an isolated Battle transaction and revalidate its working state.
+4. Build an execution plan with all information needed to execute the action.
+5. Commit costs and cooldown changes in the working state.
+6. Execute ordered effects and publish typed domain events.
+7. Process follow-up triggers and resolve defeats, victory, or failure.
+8. Commit the complete working state only if every step succeeds.
 9. Return a typed action result and refreshed read model.
 
-All predictable validation occurs before mutation. UI may request validation and
-preview data, but only the action pipeline commits gameplay state.
+UI may request validation and preview data, but only the action pipeline commits
+gameplay state. An internal failure at any execution stage discards the working
+state and cannot leave a partially applied action.
 
 ## Art and Intent Integration
 

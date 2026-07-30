@@ -175,8 +175,8 @@ func rebuild_debug_battle() -> bool:
 		if not placement.succeeded():
 			return _fail_rebuild("单位放置失败。")
 
-	var turn_result: TurnTransitionResult = _turn_service.start_battle(battle)
-	if not turn_result.succeeded:
+	var start_result: ActionExecutionResult = _action_service.start_battle(battle)
+	if not start_result.is_successful:
 		return _fail_rebuild("战斗启动失败。")
 
 	_battle = battle

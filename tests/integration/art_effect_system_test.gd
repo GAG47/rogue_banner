@@ -13,6 +13,10 @@ static func run(suite: TestSuite) -> void:
 	_test_buff_expiry_event(suite)
 	_test_common_effect_execution(suite)
 	_test_failed_condition_is_atomic(suite)
+	_test_internal_failure_is_atomic(suite)
+	_test_first_turn_trigger(suite)
+	_test_stable_buff_trigger_identity(suite)
+	_test_lethal_event_target_is_non_failing(suite)
 	_test_defeat_and_victory(suite)
 
 
@@ -246,9 +250,9 @@ static func _test_passive_trigger(suite: TestSuite) -> void:
 	)
 	for index: int in range(result.events.size()):
 		suite.assert_int_equal(
-				index + 1,
+				index + 2,
 				result.events[index].sequence_id,
-				"Battle events should receive deterministic sequence IDs."
+				"Battle events should follow the initial turn-start event."
 		)
 
 
@@ -458,6 +462,318 @@ static func _test_failed_condition_is_atomic(suite: TestSuite) -> void:
 			initial_health,
 			enemy.current_health,
 			"Failed use conditions should not execute effects."
+	)
+
+
+static func _test_internal_failure_is_atomic(suite: TestSuite) -> void:
+	var fixture: ArtEffectFixture = ArtEffectFixture.create()
+	var failing_processor: FailingBattleEventProcessor = (
+		FailingBattleEventProcessor.new()
+	)
+	var action_service: BattleActionService = BattleActionService.new(
+			GridPathfinder.new(),
+			fixture.turn_service,
+			failing_processor
+	)
+	var player: UnitState = fixture.battle.get_unit(fixture.player_unit_id)
+	var enemy: UnitState = fixture.battle.get_unit(fixture.enemy_unit_id)
+	enemy.current_health = 3
+	var art_result: ActionExecutionResult = action_service.execute(
+			fixture.battle,
+			UseArtActionRequest.create(
+					GameEnums.BattleSide.PLAYER,
+					fixture.player_unit_id,
+					0,
+					fixture.create_cell_selection(Vector2i(2, 1))
+			)
+	)
+	suite.assert_int_equal(
+			GameEnums.ActionFailureCode.EFFECT_EXECUTION_FAILED,
+			art_result.failure_code,
+			"Injected post-effect failures should reject the Art action."
+	)
+	suite.assert_int_equal(
+			5,
+			player.current_ap,
+			"Failed post-effect processing should restore AP."
+	)
+	suite.assert_int_equal(
+			0,
+			player.arts[0].current_cooldown,
+			"Failed post-effect processing should restore cooldown."
+	)
+	suite.assert_int_equal(
+			3,
+			enemy.current_health,
+			"Failed post-effect processing should restore target health."
+	)
+	suite.assert_true(
+			fixture.battle.get_unit(fixture.enemy_unit_id) == enemy,
+			"Failed actions should preserve existing Unit state objects."
+	)
+	suite.assert_true(
+			fixture.battle.grid.find_occupant(
+					GameEnums.GridOccupantKind.UNIT,
+					fixture.enemy_unit_id
+			) != null,
+			"Failed actions should preserve authoritative Grid occupancy."
+	)
+	var move_result: ActionExecutionResult = action_service.execute(
+			fixture.battle,
+			MoveActionRequest.create(
+					GameEnums.BattleSide.PLAYER,
+					fixture.player_unit_id,
+					Vector2i(0, 1)
+			)
+	)
+	suite.assert_int_equal(
+			GameEnums.ActionFailureCode.EFFECT_EXECUTION_FAILED,
+			move_result.failure_code,
+			"Injected movement-event failures should reject movement."
+	)
+	suite.assert_true(
+			fixture.battle.grid.find_occupant(
+					GameEnums.GridOccupantKind.UNIT,
+					fixture.player_unit_id
+			).value == Vector2i(1, 1),
+			"Failed movement-event processing should restore Grid position."
+	)
+	suite.assert_int_equal(
+			5,
+			player.current_ap,
+			"Failed movement-event processing should restore movement AP."
+	)
+
+	enemy.current_ap = 0
+	var enemy_ap: int = enemy.current_ap
+	var turn_result: ActionExecutionResult = action_service.execute(
+			fixture.battle,
+			EndTurnActionRequest.create(GameEnums.BattleSide.PLAYER)
+	)
+	suite.assert_int_equal(
+			GameEnums.ActionFailureCode.EFFECT_EXECUTION_FAILED,
+			turn_result.failure_code,
+			"Injected turn-event failures should reject End Turn."
+	)
+	suite.assert_true(
+			fixture.battle.phase == GameEnums.BattlePhase.PLAYER_TURN,
+			"Failed End Turn processing should restore the Battle phase."
+	)
+	suite.assert_true(
+			fixture.battle.active_side == GameEnums.BattleSide.PLAYER,
+			"Failed End Turn processing should restore the active side."
+	)
+	suite.assert_int_equal(
+			enemy_ap,
+			enemy.current_ap,
+			"Failed End Turn processing should restore side refresh changes."
+	)
+
+	var setup_fixture: BattleKernelFixture = BattleKernelFixture.create()
+	var setup_player: BattlePlacementResult = (
+		setup_fixture.placement_service.place_run_unit(
+				setup_fixture.battle,
+				setup_fixture.run_unit,
+				GameEnums.BattleSide.PLAYER,
+				Vector2i.ZERO
+		)
+	)
+	setup_fixture.placement_service.place_unit_definition(
+			setup_fixture.battle,
+			setup_fixture.core.unit,
+			GameEnums.BattleSide.ENEMY,
+			Vector2i(4, 0)
+	)
+	var setup_player_state: UnitState = setup_fixture.battle.get_unit(
+			setup_player.unit_id
+	)
+	setup_player_state.current_ap = 0
+	var start_result: ActionExecutionResult = action_service.start_battle(
+			setup_fixture.battle
+	)
+	suite.assert_int_equal(
+			GameEnums.ActionFailureCode.EFFECT_EXECUTION_FAILED,
+			start_result.failure_code,
+			"Injected first-turn event failures should reject Battle start."
+	)
+	suite.assert_true(
+			setup_fixture.battle.phase == GameEnums.BattlePhase.SETUP,
+			"Failed Battle start processing should preserve setup phase."
+	)
+	suite.assert_int_equal(
+			0,
+			setup_fixture.battle.round_number,
+			"Failed Battle start processing should preserve round zero."
+	)
+	suite.assert_int_equal(
+			0,
+			setup_player_state.current_ap,
+			"Failed Battle start processing should restore initial refresh changes."
+	)
+
+
+static func _test_first_turn_trigger(suite: TestSuite) -> void:
+	var terrain: TerrainDefinition = TerrainDefinition.new()
+	terrain.content_id = &"first_turn_ground"
+	var shield: ShieldEffectDefinition = ShieldEffectDefinition.new()
+	shield.target_source = GameEnums.EffectTargetSource.ACTOR
+	shield.flat_amount = 2
+	var same_side: EventSideRelationConditionDefinition = (
+		EventSideRelationConditionDefinition.new()
+	)
+	same_side.relation = GameEnums.SideRelation.SAME
+	var trigger: TriggerDefinition = TriggerDefinition.new()
+	trigger.event_kind = GameEnums.BattleEventKind.TURN_STARTED
+	trigger.conditions.append(same_side)
+	trigger.effects.append(shield)
+	var passive: ArtDefinition = ArtDefinition.new()
+	passive.content_id = &"first_turn_passive"
+	passive.category = GameEnums.ArtCategory.PASSIVE
+	passive.passive_triggers.append(trigger)
+	var player_definition: UnitDefinition = UnitDefinition.new()
+	player_definition.content_id = &"first_turn_player"
+	player_definition.max_health = 5
+	player_definition.max_ap = 3
+	player_definition.slot_count = 1
+	player_definition.default_arts.append(passive)
+	var enemy_definition: UnitDefinition = UnitDefinition.new()
+	enemy_definition.content_id = &"first_turn_enemy"
+	enemy_definition.max_health = 5
+	enemy_definition.max_ap = 3
+	var battle: BattleState = BattleState.create(
+			GridState.create(2, 1, terrain)
+	)
+	var placement: BattlePlacementService = BattlePlacementService.new()
+	var player_result: BattlePlacementResult = placement.place_unit_definition(
+			battle,
+			player_definition,
+			GameEnums.BattleSide.PLAYER,
+			Vector2i.ZERO
+	)
+	var enemy_result: BattlePlacementResult = placement.place_unit_definition(
+			battle,
+			enemy_definition,
+			GameEnums.BattleSide.ENEMY,
+			Vector2i(1, 0)
+	)
+	var start_result: ActionExecutionResult = (
+		BattleActionService.new().start_battle(battle)
+	)
+	suite.assert_true(
+			start_result.is_successful,
+			"Battle start should execute through the action transaction."
+	)
+	suite.assert_true(
+			start_result.events[0] is TurnStartedEvent,
+			"Battle start should publish the first player Turn-started event."
+	)
+	suite.assert_int_equal(
+			2,
+			battle.get_unit(player_result.unit_id).current_shield,
+			"Same-side Turn-start triggers should run on the first player turn."
+	)
+	suite.assert_int_equal(
+			0,
+			battle.get_unit(enemy_result.unit_id).current_shield,
+			"Opposing Units should not pass same-side Turn conditions."
+	)
+
+
+static func _test_stable_buff_trigger_identity(suite: TestSuite) -> void:
+	var fixture: ArtEffectFixture = ArtEffectFixture.create()
+	var owner: UnitState = fixture.battle.get_unit(fixture.player_unit_id)
+	var first_buff: BuffDefinition = BuffDefinition.new()
+	first_buff.content_id = &"removing_buff"
+	var remove_self: RemoveBuffEffectDefinition = (
+		RemoveBuffEffectDefinition.new()
+	)
+	remove_self.target_source = GameEnums.EffectTargetSource.ACTOR
+	remove_self.buff = first_buff
+	var removal_trigger: TriggerDefinition = TriggerDefinition.new()
+	removal_trigger.event_kind = GameEnums.BattleEventKind.SHIELD_CHANGED
+	removal_trigger.effects.append(remove_self)
+	first_buff.passive_triggers.append(removal_trigger)
+
+	var second_buff: BuffDefinition = BuffDefinition.new()
+	second_buff.content_id = &"stable_counter_buff"
+	var add_shield: ShieldEffectDefinition = ShieldEffectDefinition.new()
+	add_shield.target_source = GameEnums.EffectTargetSource.ACTOR
+	add_shield.flat_amount = 1
+	var shield_trigger: TriggerDefinition = TriggerDefinition.new()
+	shield_trigger.event_kind = GameEnums.BattleEventKind.SHIELD_CHANGED
+	shield_trigger.maximum_triggers_per_action = 1
+	shield_trigger.effects.append(add_shield)
+	second_buff.passive_triggers.append(shield_trigger)
+
+	var buff_service: BuffService = BuffService.new()
+	buff_service.apply_buff(owner, first_buff, owner.instance_id)
+	buff_service.apply_buff(owner, second_buff, owner.instance_id)
+	var initial_event: ShieldChangedEvent = ShieldChangedEvent.create(
+			owner.instance_id,
+			owner.instance_id,
+			0,
+			0
+	)
+	var process_result: BattleEventProcessResult = (
+		BattleEventProcessor.new().process(
+				fixture.battle,
+				[initial_event]
+		)
+	)
+	suite.assert_true(
+			process_result.succeeded,
+			"Buff mutation during a trigger chain should remain processable."
+	)
+	suite.assert_true(
+			owner.find_buff(first_buff) == null,
+			"Trigger effects should be able to remove an earlier Buff."
+	)
+	suite.assert_int_equal(
+			1,
+			owner.current_shield,
+			"Buff trigger limits should survive source-list reordering."
+	)
+	remove_self.buff = null
+	first_buff.passive_triggers.clear()
+
+
+static func _test_lethal_event_target_is_non_failing(
+		suite: TestSuite
+) -> void:
+	var fixture: ArtEffectFixture = ArtEffectFixture.create()
+	var response_buff: BuffDefinition = BuffDefinition.new()
+	response_buff.content_id = &"lethal_target_response"
+	var target_shield: ShieldEffectDefinition = ShieldEffectDefinition.new()
+	target_shield.target_source = (
+		GameEnums.EffectTargetSource.EVENT_TARGET_UNIT
+	)
+	target_shield.flat_amount = 1
+	var trigger: TriggerDefinition = TriggerDefinition.new()
+	trigger.event_kind = GameEnums.BattleEventKind.DAMAGE_APPLIED
+	trigger.effects.append(target_shield)
+	response_buff.passive_triggers.append(trigger)
+	BuffService.new().apply_buff(
+			fixture.battle.get_unit(fixture.player_unit_id),
+			response_buff,
+			fixture.player_unit_id
+	)
+	fixture.battle.get_unit(fixture.enemy_unit_id).current_health = 3
+	var result: ActionExecutionResult = fixture.action_service.execute(
+			fixture.battle,
+			UseArtActionRequest.create(
+					GameEnums.BattleSide.PLAYER,
+					fixture.player_unit_id,
+					0,
+					fixture.create_cell_selection(Vector2i(2, 1))
+			)
+	)
+	suite.assert_true(
+			result.is_successful,
+			"Event effects on a defeated-but-present Unit should become no-ops."
+	)
+	suite.assert_true(
+			fixture.battle.phase == GameEnums.BattlePhase.VICTORY,
+			"Lethal event-target no-ops should not block terminal resolution."
 	)
 
 

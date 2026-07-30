@@ -29,6 +29,23 @@ func validate_configuration(
 			condition.validate_configuration(result, child_path)
 
 
+func validate_context(
+		context_kind: GameEnums.ConditionContextKind,
+		event_kind: GameEnums.BattleEventKind,
+		result: DefinitionValidationResult,
+		field_path: StringName
+) -> void:
+	for index: int in range(conditions.size()):
+		var condition: ConditionDefinition = conditions[index]
+		if condition != null:
+			condition.validate_context(
+					context_kind,
+					event_kind,
+					result,
+					_child_path(field_path, index)
+			)
+
+
 func evaluate(context: ConditionContext) -> ConditionResult:
 	if context == null:
 		return ConditionResult.failure(GameEnums.ConditionStatus.INVALID_CONTEXT)
@@ -39,3 +56,7 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 		if result != null and result.passed():
 			return ConditionResult.success()
 	return ConditionResult.failure()
+
+
+func _child_path(field_path: StringName, index: int) -> StringName:
+	return StringName("%s.conditions[%d]" % [String(field_path), index])
