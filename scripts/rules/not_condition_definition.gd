@@ -40,3 +40,7 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 	if result == null or result.status == GameEnums.ConditionStatus.INVALID_CONTEXT:
 		return ConditionResult.failure(GameEnums.ConditionStatus.INVALID_CONTEXT)
 	return ConditionResult.failure() if result.passed() else ConditionResult.success()
+
+
+func requires_actor_unit() -> bool:
+	return condition != null and condition.requires_actor_unit()

@@ -6,8 +6,12 @@ var phase: GameEnums.BattlePhase = GameEnums.BattlePhase.SETUP
 var active_side: GameEnums.BattleSide = GameEnums.BattleSide.PLAYER
 var round_number: int = 0
 var battle_seed: int = 0
+var battle_session_id: int = 0
 var _units: Dictionary[int, UnitState] = {}
 var _enemy_states: Dictionary[int, EnemyState] = {}
+var _relics: Dictionary[int, BattleRelicState] = {}
+var _scrolls: Dictionary[int, BattleScrollStackState] = {}
+var _run_participants: Dictionary[int, int] = {}
 var _next_unit_instance_id: int = 1
 var _next_event_sequence_id: int = 1
 
@@ -66,6 +70,48 @@ func get_enemy_states() -> Array[EnemyState]:
 	return result
 
 
+func get_relic(relic_instance_id: int) -> BattleRelicState:
+	return _relics.get(relic_instance_id) as BattleRelicState
+
+
+func get_relics() -> Array[BattleRelicState]:
+	var ids: Array[int] = []
+	for relic_id: int in _relics:
+		ids.append(relic_id)
+	ids.sort()
+	var result: Array[BattleRelicState] = []
+	for relic_id: int in ids:
+		result.append(_relics[relic_id])
+	return result
+
+
+func get_scroll(stack_instance_id: int) -> BattleScrollStackState:
+	return _scrolls.get(stack_instance_id) as BattleScrollStackState
+
+
+func get_scrolls() -> Array[BattleScrollStackState]:
+	var ids: Array[int] = []
+	for stack_id: int in _scrolls:
+		ids.append(stack_id)
+	ids.sort()
+	var result: Array[BattleScrollStackState] = []
+	for stack_id: int in ids:
+		result.append(_scrolls[stack_id])
+	return result
+
+
+func get_run_participant_battle_ids() -> Array[int]:
+	var result: Array[int] = []
+	for battle_unit_id: int in _run_participants:
+		result.append(battle_unit_id)
+	result.sort()
+	return result
+
+
+func get_run_unit_id(battle_unit_id: int) -> int:
+	return _run_participants.get(battle_unit_id, 0)
+
+
 func duplicate_state() -> BattleState:
 	var state: BattleState = BattleState.new()
 	state.grid = grid.duplicate_state() if grid != null else null
@@ -73,6 +119,7 @@ func duplicate_state() -> BattleState:
 	state.active_side = active_side
 	state.round_number = round_number
 	state.battle_seed = battle_seed
+	state.battle_session_id = battle_session_id
 	state._next_unit_instance_id = _next_unit_instance_id
 	state._next_event_sequence_id = _next_event_sequence_id
 	for unit: UnitState in get_units():
@@ -80,6 +127,14 @@ func duplicate_state() -> BattleState:
 	for enemy_state: EnemyState in get_enemy_states():
 		state._enemy_states[enemy_state.unit_instance_id] = (
 			enemy_state.duplicate_state()
+		)
+	for relic: BattleRelicState in get_relics():
+		state._relics[relic.instance_id] = relic.duplicate_state()
+	for stack: BattleScrollStackState in get_scrolls():
+		state._scrolls[stack.instance_id] = stack.duplicate_state()
+	for battle_unit_id: int in _run_participants:
+		state._run_participants[battle_unit_id] = (
+			_run_participants[battle_unit_id]
 		)
 	return state
 
@@ -131,10 +186,23 @@ func _commit_from(source: BattleState) -> bool:
 	for enemy_id: int in removed_enemy_ids:
 		_enemy_states.erase(enemy_id)
 
+	_relics.clear()
+	for source_relic: BattleRelicState in source.get_relics():
+		_relics[source_relic.instance_id] = source_relic.duplicate_state()
+	_scrolls.clear()
+	for source_stack: BattleScrollStackState in source.get_scrolls():
+		_scrolls[source_stack.instance_id] = source_stack.duplicate_state()
+	_run_participants.clear()
+	for battle_unit_id: int in source._run_participants:
+		_run_participants[battle_unit_id] = (
+			source._run_participants[battle_unit_id]
+		)
+
 	phase = source.phase
 	active_side = source.active_side
 	round_number = source.round_number
 	battle_seed = source.battle_seed
+	battle_session_id = source.battle_session_id
 	_next_unit_instance_id = source._next_unit_instance_id
 	_next_event_sequence_id = source._next_event_sequence_id
 	return true
@@ -162,6 +230,43 @@ func _register_enemy_state(enemy_state: EnemyState) -> bool:
 	):
 		return false
 	_enemy_states[enemy_state.unit_instance_id] = enemy_state
+	return true
+
+
+func _register_relic(relic: BattleRelicState) -> bool:
+	if (
+		relic == null
+		or relic.instance_id <= 0
+		or _relics.has(relic.instance_id)
+	):
+		return false
+	_relics[relic.instance_id] = relic
+	return true
+
+
+func _register_scroll(stack: BattleScrollStackState) -> bool:
+	if (
+		stack == null
+		or stack.instance_id <= 0
+		or _scrolls.has(stack.instance_id)
+	):
+		return false
+	_scrolls[stack.instance_id] = stack
+	return true
+
+
+func _register_run_participant(
+		battle_unit_id: int,
+		run_unit_id: int
+) -> bool:
+	if (
+		battle_unit_id <= 0
+		or run_unit_id <= 0
+		or not _units.has(battle_unit_id)
+		or _run_participants.has(battle_unit_id)
+	):
+		return false
+	_run_participants[battle_unit_id] = run_unit_id
 	return true
 
 

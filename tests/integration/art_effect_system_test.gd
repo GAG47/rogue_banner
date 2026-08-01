@@ -706,10 +706,14 @@ static func _test_stable_buff_trigger_identity(suite: TestSuite) -> void:
 	second_buff.passive_triggers.append(shield_trigger)
 
 	var buff_service: BuffService = BuffService.new()
-	buff_service.apply_buff(owner, first_buff, owner.instance_id)
-	buff_service.apply_buff(owner, second_buff, owner.instance_id)
-	var initial_event: ShieldChangedEvent = ShieldChangedEvent.create(
+	var owner_source: BattleSource = BattleSource.unit(
 			owner.instance_id,
+			owner.side
+	)
+	buff_service.apply_buff(owner, first_buff, owner_source)
+	buff_service.apply_buff(owner, second_buff, owner_source)
+	var initial_event: ShieldChangedEvent = ShieldChangedEvent.create(
+			owner_source,
 			owner.instance_id,
 			0,
 			0
@@ -755,7 +759,10 @@ static func _test_lethal_event_target_is_non_failing(
 	BuffService.new().apply_buff(
 			fixture.battle.get_unit(fixture.player_unit_id),
 			response_buff,
-			fixture.player_unit_id
+			BattleSource.unit(
+					fixture.player_unit_id,
+					GameEnums.BattleSide.PLAYER
+			)
 	)
 	fixture.battle.get_unit(fixture.enemy_unit_id).current_health = 3
 	var result: ActionExecutionResult = fixture.action_service.execute(

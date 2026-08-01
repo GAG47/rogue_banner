@@ -2,11 +2,68 @@ class_name BattlePlacementService
 extends RefCounted
 
 
+func place_run_snapshot(
+		battle: BattleState,
+		setup_unit: BattleSetupUnit,
+		coordinate: Vector2i
+) -> BattlePlacementResult:
+	var battle_validation: BattlePlacementResult = (
+		_validate_battle_for_placement(battle)
+	)
+	if not battle_validation.succeeded():
+		return battle_validation
+	if (
+		setup_unit == null
+		or setup_unit.source_run_unit_id <= 0
+		or setup_unit.definition == null
+	):
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
+	var cell_validation: GridOperationResult = battle.grid.can_place_at(
+			coordinate
+	)
+	if not cell_validation.succeeded():
+		return BattlePlacementResult.failure(
+				_map_grid_code(cell_validation.code)
+		)
+	var unit_id: int = battle._allocate_unit_id()
+	var unit: UnitState = UnitState.create_from_run_snapshot(
+			unit_id,
+			setup_unit.source_run_unit_id,
+			setup_unit.definition,
+			setup_unit.current_health,
+			setup_unit.installed_art_definitions,
+			GameEnums.BattleSide.PLAYER
+	)
+	if unit == null:
+		return BattlePlacementResult.failure(
+				GameEnums.BattlePlacementCode.INVALID_UNIT
+		)
+	var placement: BattlePlacementResult = _commit_placement(
+			battle,
+			unit,
+			coordinate
+	)
+	if not placement.succeeded():
+		return placement
+	if battle._register_run_participant(
+		unit.instance_id,
+		setup_unit.source_run_unit_id
+	):
+		return placement
+	remove_unit(battle, unit.instance_id)
+	return BattlePlacementResult.failure(
+			GameEnums.BattlePlacementCode.GRID_STATE_REJECTED
+	)
+
+
 func place_run_unit(
 		battle: BattleState,
 		run_unit: RunUnitState,
 		side: GameEnums.BattleSide,
-		coordinate: Vector2i
+		coordinate: Vector2i,
+		installed_art_definitions: Array[ArtDefinition] = []
 ) -> BattlePlacementResult:
 	var battle_validation: BattlePlacementResult = _validate_battle_for_placement(battle)
 	if not battle_validation.succeeded():
@@ -15,7 +72,20 @@ func place_run_unit(
 		return BattlePlacementResult.failure(
 				GameEnums.BattlePlacementCode.INVALID_UNIT
 		)
-	if not ArtLoadoutService.new().validate_loadout(run_unit).succeeded():
+	var loadout: Array[ArtDefinition] = []
+	if installed_art_definitions.is_empty():
+		for slot_index: int in range(run_unit.definition.slot_count):
+			loadout.append(
+					run_unit.definition.default_arts[slot_index]
+					if slot_index < run_unit.definition.default_arts.size()
+					else null
+			)
+	else:
+		loadout.assign(installed_art_definitions)
+	if not ArtLoadoutService.new().validate_definition_loadout(
+		run_unit,
+		loadout
+	).succeeded():
 		return BattlePlacementResult.failure(
 				GameEnums.BattlePlacementCode.INVALID_UNIT
 		)
@@ -25,7 +95,12 @@ func place_run_unit(
 		return BattlePlacementResult.failure(_map_grid_code(cell_validation.code))
 
 	var unit_id: int = battle._allocate_unit_id()
-	var unit: UnitState = UnitState.create_from_run_unit(unit_id, run_unit, side)
+	var unit: UnitState = UnitState.create_from_run_unit(
+			unit_id,
+			run_unit,
+			loadout,
+			side
+	)
 	if unit == null:
 		return BattlePlacementResult.failure(
 				GameEnums.BattlePlacementCode.INVALID_UNIT

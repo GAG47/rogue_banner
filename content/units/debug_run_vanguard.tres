@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UnitDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/unit_definition.gd" id="1_unit"]
+[ext_resource type="Resource" path="res://content/arts/debug_strike.tres" id="2_strike"]
+
+[resource]
+script = ExtResource("1_unit")
+content_id = &"debug_run_vanguard"
+display_name = "远征先锋"
+max_health = 10
+base_attack = 3
+max_ap = 5
+slot_count = 2
+default_arts = [ExtResource("2_strike")]
+

@@ -11,23 +11,24 @@ static func capabilities_for(kind: GameEnums.BattleEventKind) -> int:
 					| GameEnums.EventDataCapability.POSITION
 			)
 		GameEnums.BattleEventKind.DAMAGE_APPLIED:
-			return _unit_pair_capabilities()
+			return _possible_unit_pair_capabilities()
 		GameEnums.BattleEventKind.HEALING_APPLIED:
-			return _unit_pair_capabilities()
+			return _possible_unit_pair_capabilities()
 		GameEnums.BattleEventKind.SHIELD_CHANGED:
-			return _unit_pair_capabilities()
+			return _possible_unit_pair_capabilities()
 		GameEnums.BattleEventKind.BUFF_APPLIED:
 			return (
-					_unit_pair_capabilities()
+					_possible_unit_pair_capabilities()
 					| GameEnums.EventDataCapability.BUFF
 			)
 		GameEnums.BattleEventKind.BUFF_REMOVED:
 			return (
-					GameEnums.EventDataCapability.TARGET_UNIT
+					GameEnums.EventDataCapability.SOURCE_UNIT
+					| GameEnums.EventDataCapability.TARGET_UNIT
 					| GameEnums.EventDataCapability.BUFF
 			)
 		GameEnums.BattleEventKind.UNIT_DEFEATED:
-			return _unit_pair_capabilities()
+			return _possible_unit_pair_capabilities()
 		GameEnums.BattleEventKind.ART_USED:
 			return (
 					_unit_pair_capabilities()
@@ -48,6 +49,11 @@ static func capabilities_for(kind: GameEnums.BattleEventKind) -> int:
 					GameEnums.EventDataCapability.BATTLE_PHASE
 					| GameEnums.EventDataCapability.ROUND
 			)
+		GameEnums.BattleEventKind.SCROLL_USED:
+			return (
+					_unit_pair_capabilities()
+					| GameEnums.EventDataCapability.SCROLL
+			)
 	return 0
 
 
@@ -58,13 +64,26 @@ static func supports(
 	return (capabilities_for(kind) & int(capability)) == int(capability)
 
 
+static func guarantees(
+		kind: GameEnums.BattleEventKind,
+		capability: GameEnums.EventDataCapability
+) -> bool:
+	return (
+			_required_capabilities_for(kind) & int(capability)
+	) == int(capability)
+
+
 static func is_valid_event(event: BattleEvent) -> bool:
 	if event == null:
 		return false
-	var capabilities: int = capabilities_for(event.kind)
+	var capabilities: int = _required_capabilities_for(event.kind)
 	if (
 		(capabilities & GameEnums.EventDataCapability.SOURCE_UNIT) != 0
 		and event.source_unit_id <= 0
+	):
+		return false
+	if _requires_source(event.kind) and (
+		event.source == null or not event.source.is_valid()
 	):
 		return false
 	if (
@@ -124,6 +143,13 @@ static func is_valid_event(event: BattleEvent) -> bool:
 						or ended.final_phase == GameEnums.BattlePhase.FAILURE
 					)
 			)
+		GameEnums.BattleEventKind.SCROLL_USED:
+			var scroll_used: ScrollUsedEvent = event as ScrollUsedEvent
+			return (
+					scroll_used != null
+					and scroll_used.scroll_definition != null
+					and scroll_used.scroll_stack_instance_id > 0
+			)
 	return false
 
 
@@ -132,6 +158,43 @@ static func _unit_pair_capabilities() -> int:
 			GameEnums.EventDataCapability.SOURCE_UNIT
 			| GameEnums.EventDataCapability.TARGET_UNIT
 	)
+
+
+static func _possible_unit_pair_capabilities() -> int:
+	return _unit_pair_capabilities()
+
+
+static func _required_capabilities_for(
+		kind: GameEnums.BattleEventKind
+) -> int:
+	match kind:
+		GameEnums.BattleEventKind.UNIT_MOVED:
+			return _unit_pair_capabilities()
+		GameEnums.BattleEventKind.DAMAGE_APPLIED, \
+		GameEnums.BattleEventKind.HEALING_APPLIED, \
+		GameEnums.BattleEventKind.SHIELD_CHANGED, \
+		GameEnums.BattleEventKind.BUFF_APPLIED, \
+		GameEnums.BattleEventKind.BUFF_REMOVED, \
+		GameEnums.BattleEventKind.UNIT_DEFEATED:
+			return GameEnums.EventDataCapability.TARGET_UNIT
+		GameEnums.BattleEventKind.ART_USED, \
+		GameEnums.BattleEventKind.SCROLL_USED:
+			return _unit_pair_capabilities()
+	return 0
+
+
+static func _requires_source(kind: GameEnums.BattleEventKind) -> bool:
+	return kind in [
+		GameEnums.BattleEventKind.UNIT_MOVED,
+		GameEnums.BattleEventKind.DAMAGE_APPLIED,
+		GameEnums.BattleEventKind.HEALING_APPLIED,
+		GameEnums.BattleEventKind.SHIELD_CHANGED,
+		GameEnums.BattleEventKind.BUFF_APPLIED,
+		GameEnums.BattleEventKind.BUFF_REMOVED,
+		GameEnums.BattleEventKind.UNIT_DEFEATED,
+		GameEnums.BattleEventKind.ART_USED,
+		GameEnums.BattleEventKind.SCROLL_USED,
+	]
 
 
 static func _is_valid_side(side: GameEnums.BattleSide) -> bool:

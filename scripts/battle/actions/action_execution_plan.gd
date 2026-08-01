@@ -6,6 +6,8 @@ var ap_cost: int = 0
 var movement_path: Array[Vector2i] = []
 var art_slot_index: int = -1
 var art_definition: ArtDefinition
+var scroll_definition: ScrollDefinition
+var scroll_stack_instance_id: int = 0
 var resolved_targets: ResolvedTargetSet
 var cooldown_to_apply: int = 0
 var effect_plans: Array[EffectExecutionPlan] = []

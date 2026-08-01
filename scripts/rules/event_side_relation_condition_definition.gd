@@ -44,12 +44,21 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 	else:
 		return ConditionResult.failure(GameEnums.ConditionStatus.INVALID_CONTEXT)
 
-	var owner: UnitState = battle_context.battle.get_unit(
-			battle_context.actor_unit_id
-	)
-	if owner == null:
+	var owner_side: GameEnums.BattleSide
+	if battle_context.trigger_source != null:
+		owner_side = battle_context.trigger_source.side
+	else:
+		var owner: UnitState = battle_context.battle.get_unit(
+				battle_context.actor_unit_id
+		)
+		if owner == null:
+			return ConditionResult.failure(
+					GameEnums.ConditionStatus.INVALID_CONTEXT
+			)
+		owner_side = owner.side
+	if battle_context.trigger_source == null and battle_context.actor_unit_id <= 0:
 		return ConditionResult.failure(GameEnums.ConditionStatus.INVALID_CONTEXT)
-	var same_side: bool = owner.side == event_side
+	var same_side: bool = owner_side == event_side
 	if relation == GameEnums.SideRelation.SAME:
 		return ConditionResult.success() if same_side else ConditionResult.failure()
 	return ConditionResult.failure() if same_side else ConditionResult.success()

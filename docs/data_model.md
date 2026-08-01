@@ -21,6 +21,12 @@ Battle-owned Enemy state, persistent Intent plans, deterministic generation,
 read-only preview, and automatic enemy turns. The final v4 contracts are
 detailed in `docs/enemy_intent_system.md`.
 
+Run and Reward system v5 extends it with runtime Art and Relic identity,
+transactional Run commands, Battle setup and outcome transfer, Scroll actions,
+Relic Battle triggers, deterministic Reward offers, shops, recruitment, and Run
+flow phases. The final v5 contracts are detailed in
+`docs/run_reward_system.md`.
+
 All Definition types are Godot `Resource` classes registered with `class_name`.
 All runtime State types are `RefCounted` classes created uniquely for a Run or
 Battle.
@@ -112,9 +118,10 @@ the selected variant rather than scattered flags.
 
 ### RelicDefinition
 
-`passive_triggers` contains typed trigger configurations. A Relic Definition
-requires at least one trigger, but the current layer does not implement event
-binding or trigger execution.
+`maximum_copies` sets the Run ownership limit. `passive_triggers` contains typed
+trigger configurations. Battle copies every owned runtime Relic instance and
+registers each as a stable player-side event source. Relic triggers cannot use
+conditions, scaling, movement, or effect targets that require a Unit owner.
 
 ### ScrollDefinition
 
@@ -207,8 +214,9 @@ Grid occupancy table.
 ### BuffState
 
 `BuffState` is Battle-owned and contains a Battle-local instance ID, immutable
-`BuffDefinition` reference, source Unit ID, current stacks, and remaining
-duration. Stacks and duration never belong to the shared Buff Definition.
+`BuffDefinition` reference, typed `BattleSource`, current stacks, and remaining
+duration. Its optional source Unit ID is derived from that source. Stacks and
+duration never belong to the shared Buff Definition.
 
 ### RunUnitState
 
@@ -218,18 +226,28 @@ contains:
 - Runtime `instance_id`
 - `UnitDefinition` reference
 - Between-Battle current health
-- A copied array of installed `ArtDefinition` references
+- An array of installed `RunArtState.instance_id` values aligned to Unit slots
 
 It does not contain Battle AP, cooldowns, side, or grid position.
-`UnitState.create_from_run_unit` creates independent Battle state and retains
-the source Run Unit ID for a future explicit Battle outcome. Both creation paths
-reject an invalid loadout rather than silently importing it into Battle.
+`BattleSetupService` resolves the instance IDs to Definition references,
+validates the complete loadout, and creates independent Battle state. The
+Battle participant map retains the source Run Unit ID even if its Battle Unit is
+later removed.
+
+### RunArtState and RunRelicState
+
+`RunArtState` owns a unique runtime Art instance ID and its current immutable
+Art Definition variant. Two equal Art Definitions therefore remain distinct
+inventory items, and upgrading one instance does not upgrade another.
+
+`RunRelicState` owns a unique runtime Relic instance ID and its shared immutable
+Relic Definition. Duplicate limits are enforced by `RunCommandService`.
 
 ### ScrollStackState
 
-`ScrollStackState` owns a `ScrollDefinition` reference and mutable quantity.
-Quantity limits are enforced by the future Run command layer, not by direct
-Definition mutation.
+`ScrollStackState` owns a unique stack ID, a `ScrollDefinition` reference, and
+mutable quantity. `RunCommandService` validates the complete quantity against
+existing stack room and total slot capacity before changing any stack.
 
 ### BattleState
 
@@ -277,20 +295,24 @@ Battle state; it cannot mutate the plan.
 
 ### RunState
 
-Run State v1 contains:
+Run State v5 contains:
 
 - `HeroDefinition` reference
 - Run seed
-- Gold
-- Run-owned Unit State
-- Owned Relic Definition references
-- Scroll Stack State
+- Team and Scroll capacities
+- Private Gold and Run phase
+- Run-owned Unit, Art, Relic, and Scroll State indexed by runtime ID
+- Monotonic runtime, Battle session, and Reward offer ID allocators
+- Reward generation count
+- Current Battle session mapping
+- Current saved Reward offer
+- Optimistic state version
 
-`RunState.create` validates the Hero and every starting Unit loadout, then copies
-the starting configuration into new mutable arrays and new `RunUnitState`
-objects. It fails instead of returning a partially initialized Run. Mutating
-Run inventory or Unit state cannot change the Hero, Unit, Art, or Relic
-Definitions.
+`RunState.create_from_setup` builds default Arts as ordinary owned
+`RunArtState` instances and installs their IDs. `RunTransaction` deep-copies all
+mutable Run state, records the source version, and rejects a stale commit.
+External systems submit `RunCommand` objects or use `RunFlowService`; they do
+not update inventories or Gold directly.
 
 ## Rule Contracts
 

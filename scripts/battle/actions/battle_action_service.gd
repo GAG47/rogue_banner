@@ -66,6 +66,11 @@ func validate(
 		return _validate_move(battle, request as MoveActionRequest)
 	if request is UseArtActionRequest:
 		return _validate_use_art(battle, request as UseArtActionRequest)
+	if request is UseScrollActionRequest:
+		return _validate_use_scroll(
+				battle,
+				request as UseScrollActionRequest
+		)
 	if request is EndTurnActionRequest:
 		return _validate_end_turn(battle, request as EndTurnActionRequest)
 	return ActionValidationResult.rejected(
@@ -109,6 +114,12 @@ func execute(
 		result = _execute_use_art(
 				transaction.working_state,
 				request as UseArtActionRequest,
+				working_validation.plan
+		)
+	elif request is UseScrollActionRequest:
+		result = _execute_use_scroll(
+				transaction.working_state,
+				request as UseScrollActionRequest,
 				working_validation.plan
 		)
 	else:
@@ -316,6 +327,99 @@ func _validate_use_art(
 	return ActionValidationResult.accepted(plan)
 
 
+func _validate_use_scroll(
+		battle: BattleState,
+		request: UseScrollActionRequest
+) -> ActionValidationResult:
+	if request.requesting_side != GameEnums.BattleSide.PLAYER:
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.SCROLL_NOT_USABLE
+		)
+	var common_failure: GameEnums.ActionFailureCode = _validate_actor_action(
+			battle,
+			request.requesting_side,
+			request.actor_unit_id
+	)
+	if common_failure != GameEnums.ActionFailureCode.NONE:
+		return ActionValidationResult.rejected(common_failure)
+	var stack: BattleScrollStackState = battle.get_scroll(
+			request.scroll_stack_instance_id
+	)
+	if stack == null or stack.definition == null:
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.SCROLL_NOT_FOUND
+		)
+	if stack.quantity <= 0:
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.SCROLL_EMPTY
+		)
+	if request.targets == null or stack.definition.targeting == null:
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.INVALID_TARGET_SELECTION
+		)
+	var actor: UnitState = battle.get_unit(request.actor_unit_id)
+	var target_result: TargetResolutionResult = _target_resolver.resolve(
+			stack.definition.targeting,
+			BattleTargetingContext.create(
+					battle,
+					actor.instance_id,
+					request.targets
+			),
+			request.targets
+	)
+	if not target_result.is_valid:
+		return ActionValidationResult.rejected(
+				target_result.failure_code
+		)
+	var source: BattleSource = BattleSource.scroll(
+			stack.instance_id,
+			GameEnums.BattleSide.PLAYER,
+			actor.instance_id
+	)
+	var condition_result: ConditionResult = _condition_evaluator.evaluate_all(
+			stack.definition.use_conditions,
+			BattleConditionContext.create(
+					battle,
+					actor.instance_id,
+					target_result.selection,
+					null,
+					target_result.resolved_targets,
+					null,
+					source
+			)
+	)
+	if condition_result.status == GameEnums.ConditionStatus.INVALID_CONTEXT:
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.CONDITION_CONTEXT_INVALID
+		)
+	if not condition_result.passed():
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.CONDITION_FAILED
+		)
+	var effect_plan_result: EffectPlanResult = _effect_planner.plan_all(
+			stack.definition.effects,
+			EffectContext.create(
+					battle,
+					actor.instance_id,
+					target_result.selection,
+					null,
+					target_result.resolved_targets,
+					null,
+					source
+			)
+	)
+	if not effect_plan_result.is_valid or effect_plan_result.plans.is_empty():
+		return ActionValidationResult.rejected(
+				GameEnums.ActionFailureCode.EFFECT_PLAN_INVALID
+		)
+	var plan: ActionExecutionPlan = ActionExecutionPlan.create(request)
+	plan.scroll_definition = stack.definition
+	plan.scroll_stack_instance_id = stack.instance_id
+	plan.resolved_targets = target_result.resolved_targets
+	plan.effect_plans.assign(effect_plan_result.plans)
+	return ActionValidationResult.accepted(plan)
+
+
 func _validate_end_turn(
 		battle: BattleState,
 		request: EndTurnActionRequest
@@ -412,7 +516,7 @@ func _execute_use_art(
 		)
 	effect_result.events.append(
 			ArtUsedEvent.create(
-					actor.instance_id,
+					BattleSource.unit(actor.instance_id, actor.side),
 					plan.art_definition,
 					plan.art_slot_index
 			)
@@ -423,6 +527,65 @@ func _execute_use_art(
 	)
 	if result.is_successful:
 		result.ap_spent = plan.ap_cost
+	return result
+
+
+func _execute_use_scroll(
+		battle: BattleState,
+		request: UseScrollActionRequest,
+		plan: ActionExecutionPlan
+) -> ActionExecutionResult:
+	var actor: UnitState = battle.get_unit(request.actor_unit_id)
+	var stack: BattleScrollStackState = battle.get_scroll(
+			request.scroll_stack_instance_id
+	)
+	if (
+		actor == null
+		or stack == null
+		or stack.definition == null
+		or stack.quantity <= 0
+		or plan == null
+		or plan.scroll_definition == null
+		or plan.scroll_definition != stack.definition
+		or plan.scroll_stack_instance_id != stack.instance_id
+	):
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.STATE_CHANGED
+		)
+
+	var source: BattleSource = BattleSource.scroll(
+			stack.instance_id,
+			GameEnums.BattleSide.PLAYER,
+			actor.instance_id
+	)
+	if not stack.consume_one():
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.STATE_CHANGED
+		)
+	var effect_result: EffectResult = _effect_executor.execute_plans(
+			battle,
+			actor.instance_id,
+			plan.effect_plans,
+			source
+	)
+	if not effect_result.succeeded():
+		return ActionExecutionResult.failure(
+				GameEnums.ActionFailureCode.EFFECT_EXECUTION_FAILED
+		)
+	effect_result.events.append(
+			ScrollUsedEvent.create(
+					source,
+					plan.scroll_definition,
+					stack.instance_id
+			)
+	)
+	var result: ActionExecutionResult = _process_events_and_resolve(
+			battle,
+			effect_result.events
+	)
+	if result.is_successful:
+		result.scroll_stack_instance_id = stack.instance_id
+		result.scrolls_consumed = 1
 	return result
 
 

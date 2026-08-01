@@ -27,7 +27,7 @@ res://
 │   ├── intents/
 │   ├── map_events/
 │   ├── relics/
-│   ├── reward_pools/
+│   ├── rewards/
 │   ├── scrolls/
 │   ├── terrains/
 │   └── units/
@@ -114,7 +114,9 @@ cycle with a global manager.
 | Current phase and active side | Turn state | Action validation, AI, and UI read models |
 | Installed arts | Unit runtime state | Art validation and read models |
 | Generated enemy action | Intent plan | Preview and execution |
-| Team, currency, relics, scrolls, and map progress | Run state | Rewards, map, persistence, and read models |
+| Team, currency, owned Arts, relics, scrolls, and active offer | Run state | Rewards, map, persistence, and read models |
+| Battle-to-Run participant and inventory mapping | Run battle session | Battle setup, outcome validation, and Run flow |
+| Generated reward or shop inventory | Reward offer stored by Run state | Reward UI and reward grant service |
 | Available authored content | Content catalog | Run setup, rewards, and persistence |
 
 Only an owning system may mutate its state. Other systems issue typed requests
@@ -284,9 +286,25 @@ Run owns the hero, team, currency, relic inventory, scroll inventory, unlock
 view, and progress. Battle receives a battle setup snapshot and returns a battle
 outcome; it does not mutate the run directly.
 
-Rewards receive a typed generation context including hero, floor, rarity rules,
-unlock state, and seeded random source. A granted reward changes Run only
-through a Run command.
+`RunFlowService` creates a `BattleSetup` from a Run transaction, records a
+`RunBattleSessionState`, and commits `IN_BATTLE` only after the Battle starts.
+`BattleOutcome` reports only persistent Unit health and Scroll quantities.
+`RunOutcomeApplier` validates the exact session mapping and writes the whole
+outcome to a Run transaction once. Battle failure ends the Run and never opens
+a victory reward.
+
+Rewards receive a typed generation context including Run seed, generation
+index, hero, floor, Battle rank, inventory, and source. Eligibility is filtered
+before deterministic weighted selection. The resulting `RewardOffer` is stored
+in Run State and remains the one source for display and grant. A claim or
+purchase changes Run only through `RunCommandService` inside the same
+transaction that updates Gold and option status.
+
+Run-owned Arts, Relics, and Scroll stacks have stable runtime instance IDs.
+Battle setup copies them into Battle-owned state. Relics enter the typed Battle
+event processor as side-owned sources without a Unit actor. Scrolls use
+`UseScrollActionRequest` and the existing targeting, condition, effect, event,
+cleanup, and terminal-resolution pipeline.
 
 Map owns route generation, node connections, selection, and progression. Map
 nodes reference encounter, reward, shop, or event definitions. They do not

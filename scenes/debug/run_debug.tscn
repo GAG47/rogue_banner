@@ -1,0 +1,246 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/debug/run_debug_controller.gd" id="1_controller"]
+[ext_resource type="Resource" path="res://content/heroes/debug_run_hero.tres" id="2_hero"]
+[ext_resource type="Resource" path="res://content/scrolls/debug_blast_scroll.tres" id="3_scroll"]
+[ext_resource type="Resource" path="res://content/terrains/debug_ground.tres" id="4_ground"]
+[ext_resource type="Resource" path="res://content/enemies/debug_archer.tres" id="5_enemy"]
+[ext_resource type="Resource" path="res://content/rewards/debug_battle_reward_pool.tres" id="6_battle_pool"]
+[ext_resource type="Resource" path="res://content/rewards/debug_shop_reward_pool.tres" id="7_shop_pool"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+bg_color = Color(0.075, 0.102, 0.14, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.24, 0.34, 0.44, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="Style_feedback"]
+bg_color = Color(0.055, 0.078, 0.105, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.21, 0.78, 0.69, 0.8)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="Style_primary"]
+bg_color = Color(0.12, 0.55, 0.49, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[node name="RunDebug" type="Control" node_paths=PackedStringArray("run_status", "battle_status", "offer_status", "feedback_label", "primary_action_button", "offer_option_button_1", "offer_option_button_2", "offer_option_button_3", "reset_button")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_controller")
+run_status = NodePath("Interface/MainColumn/StateColumns/RunPanel/RunMargin/RunColumn/RunStatus")
+battle_status = NodePath("Interface/MainColumn/StateColumns/BattlePanel/BattleMargin/BattleColumn/BattleStatus")
+offer_status = NodePath("Interface/MainColumn/StateColumns/OfferPanel/OfferMargin/OfferColumn/OfferStatus")
+feedback_label = NodePath("Interface/MainColumn/FeedbackLabel")
+primary_action_button = NodePath("Interface/MainColumn/ActionRow/PrimaryActionButton")
+offer_option_button_1 = NodePath("Interface/MainColumn/ActionRow/OfferOptionButton1")
+offer_option_button_2 = NodePath("Interface/MainColumn/ActionRow/OfferOptionButton2")
+offer_option_button_3 = NodePath("Interface/MainColumn/ActionRow/OfferOptionButton3")
+reset_button = NodePath("Interface/MainColumn/ActionRow/ResetButton")
+hero_definition = ExtResource("2_hero")
+starting_scroll = ExtResource("3_scroll")
+ground_terrain = ExtResource("4_ground")
+enemy_definition = ExtResource("5_enemy")
+battle_reward_pool = ExtResource("6_battle_pool")
+shop_reward_pool = ExtResource("7_shop_pool")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.028, 0.039, 0.055, 1)
+
+[node name="Interface" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 36.0
+offset_top = 28.0
+offset_right = -36.0
+offset_bottom = -28.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MainColumn" type="VBoxContainer" parent="Interface"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="SceneTitle" type="Label" parent="Interface/MainColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 0.98, 1)
+theme_override_font_sizes/font_size = 28
+text = "局内构筑、奖励与战斗结果 v5"
+
+[node name="SceneSubtitle" type="Label" parent="Interface/MainColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.53, 0.65, 0.75, 1)
+theme_override_font_sizes/font_size = 14
+text = "战斗快照 → 结果写回 → 奖励选择 → 商店构筑 → 下一场战斗"
+
+[node name="StateColumns" type="HBoxContainer" parent="Interface/MainColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 14
+
+[node name="RunPanel" type="PanelContainer" parent="Interface/MainColumn/StateColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="RunMargin" type="MarginContainer" parent="Interface/MainColumn/StateColumns/RunPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
+
+[node name="RunColumn" type="VBoxContainer" parent="Interface/MainColumn/StateColumns/RunPanel/RunMargin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="RunTitle" type="Label" parent="Interface/MainColumn/StateColumns/RunPanel/RunMargin/RunColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.28, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 20
+text = "局内状态"
+
+[node name="RunStatus" type="RichTextLabel" parent="Interface/MainColumn/StateColumns/RunPanel/RunMargin/RunColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.86, 0.91, 0.95, 1)
+theme_override_font_sizes/normal_font_size = 15
+text = "正在创建局内状态……"
+fit_content = false
+scroll_active = true
+
+[node name="BattlePanel" type="PanelContainer" parent="Interface/MainColumn/StateColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="BattleMargin" type="MarginContainer" parent="Interface/MainColumn/StateColumns/BattlePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
+
+[node name="BattleColumn" type="VBoxContainer" parent="Interface/MainColumn/StateColumns/BattlePanel/BattleMargin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="BattleTitle" type="Label" parent="Interface/MainColumn/StateColumns/BattlePanel/BattleMargin/BattleColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.67, 0.33, 1)
+theme_override_font_sizes/font_size = 20
+text = "战斗副本"
+
+[node name="BattleStatus" type="RichTextLabel" parent="Interface/MainColumn/StateColumns/BattlePanel/BattleMargin/BattleColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.86, 0.91, 0.95, 1)
+theme_override_font_sizes/normal_font_size = 15
+text = "尚未进入战斗。"
+fit_content = false
+scroll_active = true
+
+[node name="OfferPanel" type="PanelContainer" parent="Interface/MainColumn/StateColumns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="OfferMargin" type="MarginContainer" parent="Interface/MainColumn/StateColumns/OfferPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 16
+
+[node name="OfferColumn" type="VBoxContainer" parent="Interface/MainColumn/StateColumns/OfferPanel/OfferMargin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="OfferTitle" type="Label" parent="Interface/MainColumn/StateColumns/OfferPanel/OfferMargin/OfferColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.57, 0.96, 1)
+theme_override_font_sizes/font_size = 20
+text = "奖励与商店"
+
+[node name="OfferStatus" type="RichTextLabel" parent="Interface/MainColumn/StateColumns/OfferPanel/OfferMargin/OfferColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/default_color = Color(0.86, 0.91, 0.95, 1)
+theme_override_font_sizes/normal_font_size = 15
+text = "当前没有报价。"
+fit_content = false
+scroll_active = true
+
+[node name="FeedbackLabel" type="Label" parent="Interface/MainColumn"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.94, 0.9, 1)
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("Style_feedback")
+text = "正在初始化 v5 调试流程……"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ActionRow" type="HBoxContainer" parent="Interface/MainColumn"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PrimaryActionButton" type="Button" parent="Interface/MainColumn/ActionRow"]
+custom_minimum_size = Vector2(210, 46)
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("Style_primary")
+text = "继续"
+
+[node name="OfferOptionButton1" type="Button" parent="Interface/MainColumn/ActionRow"]
+custom_minimum_size = Vector2(170, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "奖励一"
+
+[node name="OfferOptionButton2" type="Button" parent="Interface/MainColumn/ActionRow"]
+custom_minimum_size = Vector2(170, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "奖励二"
+
+[node name="OfferOptionButton3" type="Button" parent="Interface/MainColumn/ActionRow"]
+custom_minimum_size = Vector2(170, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "奖励三"
+
+[node name="ResetButton" type="Button" parent="Interface/MainColumn/ActionRow"]
+custom_minimum_size = Vector2(90, 46)
+layout_mode = 2
+text = "重置"
+

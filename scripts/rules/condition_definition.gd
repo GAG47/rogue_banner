@@ -19,5 +19,9 @@ func validate_context(
 	pass
 
 
+func requires_actor_unit() -> bool:
+	return false
+
+
 @abstract
 func evaluate(context: ConditionContext) -> ConditionResult

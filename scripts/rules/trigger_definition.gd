@@ -75,7 +75,7 @@ func validate_configuration(
 		elif (
 			effect.target_source
 			== GameEnums.EffectTargetSource.EVENT_SOURCE_UNIT
-			and not BattleEventSchema.supports(
+			and not BattleEventSchema.guarantees(
 					event_kind,
 					GameEnums.EventDataCapability.SOURCE_UNIT
 			)
@@ -88,7 +88,7 @@ func validate_configuration(
 		elif (
 			effect.target_source
 			== GameEnums.EffectTargetSource.EVENT_TARGET_UNIT
-			and not BattleEventSchema.supports(
+			and not BattleEventSchema.guarantees(
 					event_kind,
 					GameEnums.EventDataCapability.TARGET_UNIT
 			)
@@ -105,6 +105,55 @@ func validate_configuration(
 					"Trigger effects cannot request a selected-Cell move."
 			)
 		effect.validate_configuration(result, effect_path)
+
+
+func validate_source_configuration(
+		source_kind: GameEnums.TriggerSourceKind,
+		result: DefinitionValidationResult,
+		field_path: StringName
+) -> void:
+	if source_kind != GameEnums.TriggerSourceKind.RELIC:
+		return
+	for index: int in range(conditions.size()):
+		var condition: ConditionDefinition = conditions[index]
+		if condition != null and condition.requires_actor_unit():
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					_indexed_path(field_path, &"conditions", index),
+					"Relic triggers cannot use Conditions that require a Unit owner."
+			)
+	for index: int in range(effects.size()):
+		var effect: EffectDefinition = effects[index]
+		if effect == null:
+			continue
+		var effect_path: StringName = _indexed_path(
+				field_path,
+				&"effects",
+				index
+		)
+		if effect.target_source == GameEnums.EffectTargetSource.ACTOR:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					effect_path,
+					"Relic trigger effects cannot target a Unit actor."
+			)
+		if (
+			effect is ScaledUnitEffectDefinition
+			and not is_zero_approx(
+					(effect as ScaledUnitEffectDefinition).attribute_multiplier
+			)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					effect_path,
+					"Relic trigger effects cannot scale from a Unit attribute."
+			)
+		if effect is ForcedMovementEffectDefinition:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_VALUE,
+					effect_path,
+					"Relic triggers cannot use actor-relative forced movement."
+			)
 
 
 func _child_path(parent: StringName, child: StringName) -> StringName:

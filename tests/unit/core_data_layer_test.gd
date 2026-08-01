@@ -213,14 +213,15 @@ static func _test_upgrade_variant_validation(suite: TestSuite) -> void:
 	unit_definition.slot_count = 1
 	var run_unit: RunUnitState = RunUnitState.create(1, unit_definition)
 	var service: ArtLoadoutService = ArtLoadoutService.new()
+	var run_art: RunArtState = RunArtState.create(1, base_art)
 	suite.assert_true(
-			service.install(run_unit, base_art, 0).succeeded(),
+			service.install(run_unit, run_art, 0).succeeded(),
 			"Valid base Arts should install before an upgrade is configured."
 	)
 	base_art.upgraded_variant = invalid_variant
 	suite.assert_int_equal(
 			GameEnums.ArtLoadoutCode.INVALID_ART,
-			service.upgrade(run_unit, 0).code,
+			service.upgrade(run_unit, run_art, 0).code,
 			"Upgrade execution should fully validate the resulting Art."
 	)
 
@@ -358,10 +359,17 @@ static func _test_definition_state_separation(suite: TestSuite) -> void:
 	)
 
 	var run_state: RunState = RunState.create(fixture.hero, 321)
-	run_state.gold = 50
-	run_state.team[0].current_health = 4
-	run_state.team[0].installed_arts.clear()
-	run_state.relics.clear()
+	var command_service: RunCommandService = RunCommandService.new()
+	command_service.execute(run_state, ChangeGoldCommand.create(50))
+	var run_unit: RunUnitState = run_state.get_units()[0]
+	command_service.execute(
+			run_state,
+			UninstallArtCommand.create(run_unit.instance_id, 0)
+	)
+	command_service.execute(
+			run_state,
+			RemoveRelicCommand.create(run_state.get_relics()[0].instance_id)
+	)
 
 	suite.assert_int_equal(
 			12,

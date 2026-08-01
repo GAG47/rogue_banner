@@ -86,7 +86,23 @@ implemented set adds:
 - Automatic enemy turns with explicit fizzle and internal-failure semantics
 - Transactional Battle start, enemy turn, and next-turn Intent generation
 
-Types outside the v1, v2, v3, and v4 implemented sets remain planned contracts.
+## Run and Reward System v5
+
+Implemented v5 contracts are recorded in `docs/run_reward_system.md`. The
+implemented set adds:
+
+- `RunArtState`, `RunRelicState`, Battle Relic state, and Battle Scroll state
+- Private Run inventories, runtime IDs, phases, sessions, offers, and optimistic
+  Run transactions
+- Typed Run commands for Gold, Units, Arts, Relics, Scrolls, and healing
+- `BattleSetup`, `BattleOutcome`, and one-time transactional outcome application
+- Typed Battle sources, Relic trigger binding, and `UseScrollActionRequest`
+- Reward payload, entry, and pool Definitions
+- Deterministic filtering and weighted Reward offer generation
+- Pick-one, take-all, and purchase-any offer transactions
+- `RunFlowService` orchestration across Battle, reward, shop, and Run phases
+
+Types outside the v1 through v5 implemented sets remain planned contracts.
 
 ## Enums
 
@@ -112,8 +128,12 @@ Types outside the v1, v2, v3, and v4 implemented sets remain planned contracts.
 | `EventDataCapability` | Typed payload facts guaranteed by an event kind |
 | `ConditionContextKind` | Installation, action-use, event-trigger, or enemy-decision context |
 | `SideRelation` | Same or opposing side relative to a passive owner |
-| `TriggerSourceKind` | Stable Art or Buff trigger source category |
-| `RewardKind` | Unit, Art, Relic, Scroll, currency, or service |
+| `TriggerSourceKind` | Stable Art, Buff, or Relic trigger source category |
+| `BattleSourceKind` | Unit, Relic, Scroll, or system effect and event origin |
+| `RunPhase` | Ready, in Battle, choosing reward, shopping, or ended |
+| `RewardKind` | Currency, Art, Relic, Scroll, Unit, healing, or Art upgrade |
+| `RewardOfferRule` | Pick one, take all, or purchase any |
+| `RewardSource` | Battle, shop, recruitment, chest, or event origin |
 | `MapNodeKind` | Battle, elite, boss, shop, camp, chest, or event |
 | `ActionFailureCode` | Stable machine-readable action rejection categories |
 
@@ -148,7 +168,9 @@ or any other per-run mutable value.
 | Type | Authoritative data |
 | --- | --- |
 | `UnitState` | Battle-local identity, source Run identity, Definition, health, AP, side, installed Arts, and defeat state |
-| `RunUnitState` | Run-owned Unit health and installed Art references without Battle state |
+| `RunUnitState` | Run-owned Unit health and installed runtime Art IDs without Battle state |
+| `RunArtState` | Unique owned Art identity and current Definition variant |
+| `RunRelicState` | Unique owned Relic identity and Definition |
 | `ArtState` | Art definition reference, upgrade variant, cooldown, and per-battle usage state |
 | `BuffState` | Buff definition reference, source, stacks, and remaining duration |
 | `GridState` | Bounds, cells, terrain references, and occupancy |
@@ -208,7 +230,8 @@ requires them.
 | `ActionExecutionPlan` | Fully validated costs, targets, and ordered effects |
 | `ActionExecutionResult` | Committed changes and resulting Battle phase |
 | `BattleTransaction` | Isolated working Battle State and all-or-nothing commit |
-| `BattleOutcome` | Victory, failure, rewards context, and surviving unit results |
+| `UseScrollActionRequest` | Player Unit, Scroll stack, and target selection |
+| `BattleOutcome` | Terminal phase, participant health, Scroll quantities, and Battle session identity |
 
 An execution plan is not a second state store. It is short-lived immutable data
 used to ensure predictable validation finishes before mutation begins.
@@ -278,16 +301,26 @@ truth.
 | --- | --- |
 | `RunSetup` | Hero, seed, difficulty, and initial content references |
 | `RunCommand` | Typed request to change Run state |
-| `RunResult` | Applied changes or typed rejection |
-| `RewardGenerationContext` | Hero, floor, rarity rules, unlock state, and random source |
-| `RewardCandidate` | Typed reward reference, quantity, and computed weight |
-| `RewardOffer` | Generated choices with source and generation metadata |
-| `RewardGrantRequest` | Selected offer entry and destination |
-| `ContentCatalog` | Stable ID lookup and validated authored content sets |
-| `UnlockState` | Content and rule availability visible to generation systems |
+| `RunCommandResult` | Applied runtime IDs, quantity change, or typed rejection |
+| `RunTransaction` | Deep Run working copy with version-checked atomic commit |
+| `RunFlowService` | Battle, outcome, Reward, shop, and Run phase orchestration |
+| `BattleSetup` | Immutable Battle input copied from one Run transaction |
+| `RunBattleSessionState` | Persistent Run-to-Battle identity and inventory mapping |
+| `BattleOutcome` | Typed terminal values returned without mutating Run |
+| `RunOutcomeApplier` | Exact-session validation and transactional outcome writeback |
+| `RewardGenerationContext` | Run, source, floor, Battle rank, and generation index |
+| `RewardEntryDefinition` | Payload, rarity, weight, floor bounds, duplicate rule, price, and conditions |
+| `RewardPoolDefinition` | Offer rule, option count, and authored candidates |
+| `RewardOption` | Fixed payload, rarity, price, and per-option status |
+| `RewardOffer` | Stored offer ID, source, rule, generation index, options, and status |
+| `RewardGrantDestination` | Optional Unit, Art, or immediate-install destination |
+| `RewardGenerationService` | Eligibility filtering and deterministic weighted selection |
+| `RewardGrantService` | Payload-to-Run-command adapter inside a transaction |
+| `RewardOfferService` | Atomic claim, purchase, take-all, and close operations |
 
-Reward generation filters eligibility, calculates weights, and selects entries
-as separate deterministic steps.
+Reward generation filters all candidates before selection. The saved offer,
+not a regenerated pool roll, is the source for display and granting. Content
+unlock filtering remains deferred until the Phase 9 unlock state exists.
 
 ## Map and Persistence Types
 

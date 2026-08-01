@@ -68,17 +68,21 @@ func _plan_one(
 		var scaled: ScaledUnitEffectDefinition = (
 			definition as ScaledUnitEffectDefinition
 		)
-		var actor: UnitState = context.battle.get_unit(context.actor_unit_id)
-		if actor == null:
-			return null
-		plan.amount = scaled.flat_amount + roundi(
-				float(
-					_attribute_calculator.calculate(
-							actor,
-							scaled.source_attribute
-					)
-				) * scaled.attribute_multiplier
-		)
+		plan.amount = scaled.flat_amount
+		if not is_zero_approx(scaled.attribute_multiplier):
+			var actor: UnitState = context.battle.get_unit(
+					context.actor_unit_id
+			)
+			if actor == null:
+				return null
+			plan.amount += roundi(
+					float(
+						_attribute_calculator.calculate(
+								actor,
+								scaled.source_attribute
+						)
+					) * scaled.attribute_multiplier
+			)
 		if plan.amount <= 0:
 			return null
 	elif definition is ApplyBuffEffectDefinition:

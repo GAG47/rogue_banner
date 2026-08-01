@@ -32,6 +32,8 @@ func validate(definition: DefinitionResource) -> DefinitionValidationResult:
 		_validate_buff(definition as BuffDefinition, result)
 	elif definition is IntentDefinition:
 		_validate_intent(definition as IntentDefinition, result)
+	elif definition is RewardPoolDefinition:
+		_validate_reward_pool(definition as RewardPoolDefinition, result)
 	elif definition is TagDefinition:
 		pass
 	else:
@@ -156,7 +158,7 @@ func _validate_unit(
 
 	_validate_tags(definition.tags, &"tags", result)
 
-	var default_state: RunUnitState = RunUnitState.create_empty(0, definition)
+	var default_state: RunUnitState = RunUnitState.create_empty(1, definition)
 	var loadout_service: ArtLoadoutService = ArtLoadoutService.new(null, self)
 	for index: int in range(definition.default_arts.size()):
 		var art: ArtDefinition = definition.default_arts[index]
@@ -214,6 +216,7 @@ func _validate_art(
 			definition.passive_triggers,
 			&"passive_triggers",
 			definition.category == GameEnums.ArtCategory.PASSIVE,
+			GameEnums.TriggerSourceKind.ART,
 			result
 	)
 
@@ -259,7 +262,19 @@ func _validate_relic(
 		definition: RelicDefinition,
 		result: DefinitionValidationResult
 ) -> void:
-	_validate_triggers(definition.passive_triggers, &"passive_triggers", true, result)
+	if definition.maximum_copies <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_VALUE,
+				&"maximum_copies",
+				"Maximum Relic copies must be greater than zero."
+		)
+	_validate_triggers(
+			definition.passive_triggers,
+			&"passive_triggers",
+			true,
+			GameEnums.TriggerSourceKind.RELIC,
+			result
+	)
 
 
 func _validate_scroll(
@@ -633,7 +648,166 @@ func _validate_buff(
 			definition.passive_triggers,
 			&"passive_triggers",
 			false,
+			GameEnums.TriggerSourceKind.BUFF,
 			result
+	)
+
+
+func _validate_reward_pool(
+		definition: RewardPoolDefinition,
+		result: DefinitionValidationResult
+) -> void:
+	if definition.option_count <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_REWARD,
+				&"option_count",
+				"Reward option count must be greater than zero."
+		)
+	if definition.entries.size() < definition.option_count:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_REWARD,
+				&"entries",
+				"Reward pools require at least one entry per option."
+		)
+	for index: int in range(definition.entries.size()):
+		var entry: RewardEntryDefinition = definition.entries[index]
+		var entry_path: StringName = _indexed_path(&"entries", index)
+		if entry == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					entry_path,
+					"Reward entries cannot be null."
+			)
+			continue
+		if entry.payload == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					_child_path(entry_path, &"payload"),
+					"Reward payloads cannot be null."
+			)
+		else:
+			_validate_reward_payload(
+					entry.payload,
+					_child_path(entry_path, &"payload"),
+					result
+			)
+		if not is_finite(entry.weight) or entry.weight <= 0.0:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_REWARD,
+					_child_path(entry_path, &"weight"),
+					"Reward weight must be finite and positive."
+			)
+		if (
+			entry.minimum_floor <= 0
+			or (
+				entry.maximum_floor > 0
+				and entry.maximum_floor < entry.minimum_floor
+			)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_REWARD,
+					_child_path(entry_path, &"minimum_floor"),
+					"Reward floor bounds are invalid."
+			)
+		if (
+			definition.offer_rule
+			!= GameEnums.RewardOfferRule.PURCHASE_ANY
+			and entry.price != 0
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_REWARD,
+					_child_path(entry_path, &"price"),
+					"Only purchase offers may contain priced entries."
+			)
+		if (
+			definition.offer_rule == GameEnums.RewardOfferRule.TAKE_ALL
+			and (
+				entry.payload is HealingRewardDefinition
+				or entry.payload is ArtUpgradeRewardDefinition
+			)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_REWARD,
+					_child_path(entry_path, &"payload"),
+					"Take-all rewards cannot require a target destination."
+			)
+		_validate_conditions(
+				entry.conditions,
+				_child_path(entry_path, &"conditions"),
+				GameEnums.ConditionContextKind.REWARD_GENERATION,
+				result
+		)
+
+
+func _validate_reward_payload(
+		payload: RewardPayloadDefinition,
+		field_path: StringName,
+		result: DefinitionValidationResult
+) -> void:
+	var reference: DefinitionResource
+	var expected_kind: GameEnums.RewardKind
+	if payload is CurrencyRewardDefinition:
+		expected_kind = GameEnums.RewardKind.CURRENCY
+		if (payload as CurrencyRewardDefinition).amount <= 0:
+			_add_invalid_reward(result, field_path, "Currency must be positive.")
+	elif payload is ArtRewardDefinition:
+		expected_kind = GameEnums.RewardKind.ART
+		reference = (payload as ArtRewardDefinition).art_definition
+	elif payload is RelicRewardDefinition:
+		expected_kind = GameEnums.RewardKind.RELIC
+		reference = (payload as RelicRewardDefinition).relic_definition
+	elif payload is ScrollRewardDefinition:
+		expected_kind = GameEnums.RewardKind.SCROLL
+		var scroll: ScrollRewardDefinition = payload as ScrollRewardDefinition
+		reference = scroll.scroll_definition
+		if scroll.quantity <= 0:
+			_add_invalid_reward(result, field_path, "Scroll quantity must be positive.")
+	elif payload is UnitRewardDefinition:
+		expected_kind = GameEnums.RewardKind.UNIT
+		reference = (payload as UnitRewardDefinition).unit_definition
+	elif payload is HealingRewardDefinition:
+		expected_kind = GameEnums.RewardKind.HEALING
+		if (payload as HealingRewardDefinition).amount <= 0:
+			_add_invalid_reward(result, field_path, "Healing must be positive.")
+	elif payload is ArtUpgradeRewardDefinition:
+		expected_kind = GameEnums.RewardKind.ART_UPGRADE
+	else:
+		_add_invalid_reward(result, field_path, "Reward payload type is unsupported.")
+		return
+	if payload.kind != expected_kind:
+		_add_invalid_reward(
+				result,
+				field_path,
+				"Reward payload kind does not match its concrete type."
+		)
+	if reference != null:
+		var reference_path: StringName = _child_path(field_path, &"definition")
+		if _validate_reference(reference, reference_path, result):
+			_append_prefixed_issues(
+					result,
+					validate(reference),
+					reference_path
+			)
+	elif payload is ArtRewardDefinition \
+			or payload is RelicRewardDefinition \
+			or payload is ScrollRewardDefinition \
+			or payload is UnitRewardDefinition:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				_child_path(field_path, &"definition"),
+				"Content reward payloads require a definition."
+		)
+
+
+func _add_invalid_reward(
+		result: DefinitionValidationResult,
+		field_path: StringName,
+		message: String
+) -> void:
+	result.add_issue(
+			GameEnums.DefinitionValidationCode.INVALID_REWARD,
+			field_path,
+			message
 	)
 
 
@@ -749,6 +923,7 @@ func _validate_triggers(
 		triggers: Array[TriggerDefinition],
 		field_path: StringName,
 		required: bool,
+		source_kind: GameEnums.TriggerSourceKind,
 		result: DefinitionValidationResult
 ) -> void:
 	if required and triggers.is_empty():
@@ -769,6 +944,11 @@ func _validate_triggers(
 			)
 			continue
 		trigger.validate_configuration(result, trigger_path)
+		trigger.validate_source_configuration(
+				source_kind,
+				result,
+				trigger_path
+		)
 
 
 func _validate_reference(
@@ -829,7 +1009,7 @@ func _validate_default_art_installation(
 		return
 	var installation: ArtLoadoutResult = loadout_service.install(
 			unit,
-			art,
+			RunArtState.create(slot_index + 1, art),
 			slot_index
 	)
 	if not installation.succeeded():

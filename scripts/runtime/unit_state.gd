@@ -25,19 +25,19 @@ static func create(
 
 	if unit_definition == null:
 		return null
-	var run_template: RunUnitState = RunUnitState.create(0, unit_definition)
-	if run_template == null:
+	if not DefinitionValidator.new().validate(unit_definition).is_valid():
 		return null
 
 	state.current_health = unit_definition.max_health
 	state.current_ap = unit_definition.max_ap
-	state._initialize_art_slots(run_template.installed_arts)
+	state._initialize_art_slots(unit_definition.default_arts)
 	return state
 
 
 static func create_from_run_unit(
 		unit_instance_id: int,
 		run_unit: RunUnitState,
+		installed_art_definitions: Array[ArtDefinition],
 		battle_side: GameEnums.BattleSide
 ) -> UnitState:
 	var state: UnitState = UnitState.new()
@@ -47,7 +47,10 @@ static func create_from_run_unit(
 	if (
 		run_unit == null
 		or run_unit.definition == null
-		or not ArtLoadoutService.new().validate_loadout(run_unit).succeeded()
+		or not ArtLoadoutService.new().validate_definition_loadout(
+				run_unit,
+				installed_art_definitions
+		).succeeded()
 	):
 		return null
 
@@ -59,8 +62,39 @@ static func create_from_run_unit(
 			run_unit.definition.max_health
 	)
 	state.current_ap = run_unit.definition.max_ap
-	state._initialize_art_slots(run_unit.installed_arts)
+	state._initialize_art_slots(installed_art_definitions)
 	return state
+
+
+static func create_from_run_snapshot(
+		unit_instance_id: int,
+		source_unit_id: int,
+		unit_definition: UnitDefinition,
+		remaining_health: int,
+		installed_art_definitions: Array[ArtDefinition],
+		battle_side: GameEnums.BattleSide
+) -> UnitState:
+	var run_unit: RunUnitState = RunUnitState.create_empty(
+			source_unit_id,
+			unit_definition
+	)
+	if run_unit == null:
+		return null
+	run_unit.current_health = remaining_health
+	for slot_index: int in range(
+		mini(
+			installed_art_definitions.size(),
+			run_unit.installed_art_instance_ids.size()
+		)
+	):
+		if installed_art_definitions[slot_index] != null:
+			run_unit.installed_art_instance_ids[slot_index] = slot_index + 1
+	return create_from_run_unit(
+			unit_instance_id,
+			run_unit,
+			installed_art_definitions,
+			battle_side
+	)
 
 
 func refresh_for_turn(maximum_ap: int = -1) -> void:

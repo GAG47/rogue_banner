@@ -21,6 +21,7 @@ class TriggerBinding:
 	var source_instance_id: int = 0
 	var trigger_index: int = 0
 	var trigger: TriggerDefinition
+	var effect_source: BattleSource
 
 
 var _condition_evaluator: ConditionEvaluator
@@ -99,7 +100,6 @@ func _process_trigger(
 		event: BattleEvent,
 		counters: Array[TriggerActivationCounter]
 ) -> BattleEventProcessResult:
-	var owner: UnitState = battle.get_unit(binding.owner_unit_id)
 	var trigger: TriggerDefinition = binding.trigger
 	if trigger == null or trigger.event_kind != event.kind:
 		return BattleEventProcessResult.success([])
@@ -112,11 +112,12 @@ func _process_trigger(
 
 	var context: BattleConditionContext = BattleConditionContext.create(
 			battle,
-			owner.instance_id,
+			binding.owner_unit_id,
 			null,
 			null,
 			null,
-			event
+			event,
+			binding.effect_source
 	)
 	var condition_result: ConditionResult = _condition_evaluator.evaluate_all(
 			trigger.conditions,
@@ -131,11 +132,12 @@ func _process_trigger(
 
 	var effect_context: EffectContext = EffectContext.create(
 			battle,
-			owner.instance_id,
+			binding.owner_unit_id,
 			null,
 			null,
 			null,
-			event
+			event,
+			binding.effect_source
 	)
 	var plan_result: EffectPlanResult = _effect_planner.plan_all(
 			trigger.effects,
@@ -148,8 +150,9 @@ func _process_trigger(
 	counter.count += 1
 	var effect_result: EffectResult = _effect_executor.execute_plans(
 			battle,
-			owner.instance_id,
-			plan_result.plans
+			binding.owner_unit_id,
+			plan_result.plans,
+			binding.effect_source
 	)
 	if not effect_result.succeeded():
 		return BattleEventProcessResult.failure(
@@ -206,7 +209,11 @@ func _collect_trigger_bindings(
 								trigger_index,
 								art_state.definition.passive_triggers[
 									trigger_index
-								]
+								],
+								BattleSource.unit(
+										owner.instance_id,
+										owner.side
+								)
 						)
 				)
 		for buff: BuffState in owner.get_buffs():
@@ -221,9 +228,32 @@ func _collect_trigger_bindings(
 								GameEnums.TriggerSourceKind.BUFF,
 								buff.instance_id,
 								trigger_index,
-								buff.definition.passive_triggers[trigger_index]
+								buff.definition.passive_triggers[trigger_index],
+								BattleSource.unit(
+										owner.instance_id,
+										owner.side
+								)
 						)
 				)
+	for relic: BattleRelicState in battle.get_relics():
+		if relic == null or relic.definition == null:
+			continue
+		for trigger_index: int in range(
+			relic.definition.passive_triggers.size()
+		):
+			bindings.append(
+					_create_binding(
+							0,
+							GameEnums.TriggerSourceKind.RELIC,
+							relic.instance_id,
+							trigger_index,
+							relic.definition.passive_triggers[trigger_index],
+							BattleSource.relic(
+									relic.instance_id,
+									relic.side
+							)
+					)
+			)
 	return bindings
 
 
@@ -232,7 +262,8 @@ func _create_binding(
 		source_kind: GameEnums.TriggerSourceKind,
 		source_instance_id: int,
 		trigger_index: int,
-		trigger: TriggerDefinition
+		trigger: TriggerDefinition,
+		effect_source: BattleSource
 ) -> TriggerBinding:
 	var binding: TriggerBinding = TriggerBinding.new()
 	binding.owner_unit_id = owner_unit_id
@@ -240,6 +271,7 @@ func _create_binding(
 	binding.source_instance_id = source_instance_id
 	binding.trigger_index = trigger_index
 	binding.trigger = trigger
+	binding.effect_source = effect_source
 	return binding
 
 
@@ -249,6 +281,20 @@ func _is_binding_active(
 ) -> bool:
 	if battle == null or binding == null:
 		return false
+	if binding.source_kind == GameEnums.TriggerSourceKind.RELIC:
+		var relic: BattleRelicState = battle.get_relic(
+				binding.source_instance_id
+		)
+		return (
+				relic != null
+				and relic.definition != null
+				and binding.trigger_index >= 0
+				and binding.trigger_index
+				< relic.definition.passive_triggers.size()
+				and relic.definition.passive_triggers[
+					binding.trigger_index
+				] == binding.trigger
+		)
 	var owner: UnitState = battle.get_unit(binding.owner_unit_id)
 	if owner == null or owner.is_defeated():
 		return false

@@ -166,6 +166,9 @@ actual behavior requirements. Do not predict a complete Boss scripting language.
 
 ## Phase 7: Run Construction
 
+Implemented in v5. Final contracts and failure semantics are recorded in
+`docs/run_reward_system.md`.
+
 Complete:
 
 - Team and Unit management
@@ -183,6 +186,10 @@ Gate:
 - All rewards use one generation pipeline.
 - Hero, floor, rarity, unlock state, and seeded randomness are explicit inputs.
 - Battle returns outcomes and never mutates Run directly.
+
+The v5 implementation passes hero and current Run ownership through the
+generation context. Content unlock filtering remains an explicit Phase 9 input
+because no authoritative unlock state exists yet.
 
 ## Phase 8: Map and Events
 

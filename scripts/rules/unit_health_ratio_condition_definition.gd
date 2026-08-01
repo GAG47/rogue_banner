@@ -84,3 +84,7 @@ func _compare(value: float) -> bool:
 		GameEnums.NumericComparison.GREATER_OR_EQUAL:
 			return value >= threshold
 	return false
+
+
+func requires_actor_unit() -> bool:
+	return true

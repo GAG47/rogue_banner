@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="ArtDefinition" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/art_definition.gd" id="1_art"]
+[ext_resource type="Script" path="res://scripts/rules/targeting_definition.gd" id="2_targeting"]
+[ext_resource type="Script" path="res://scripts/effects/damage_effect_definition.gd" id="3_damage"]
+[ext_resource type="Resource" path="res://content/arts/debug_run_strike_upgraded.tres" id="4_upgrade"]
+
+[sub_resource type="Resource" id="Targeting_enemy_cell"]
+script = ExtResource("2_targeting")
+target_kind = 0
+target_relation = 2
+minimum_range = 1
+maximum_range = 4
+minimum_targets = 1
+maximum_targets = 1
+requires_line_of_sight = true
+
+[sub_resource type="Resource" id="Effect_damage"]
+script = ExtResource("3_damage")
+target_source = 1
+flat_amount = 7
+source_attribute = 1
+attribute_multiplier = 0.0
+
+[resource]
+script = ExtResource("1_art")
+content_id = &"debug_run_strike"
+display_name = "贯穿突击"
+category = 0
+ap_cost = 1
+cooldown = 0
+targeting = SubResource("Targeting_enemy_cell")
+effects = [SubResource("Effect_damage")]
+upgraded_variant = ExtResource("4_upgrade")
+

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="HeroDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/hero_definition.gd" id="1_hero"]
+[ext_resource type="Resource" path="res://content/units/debug_run_vanguard.tres" id="2_unit"]
+[ext_resource type="Resource" path="res://content/arts/debug_run_strike.tres" id="3_art"]
+
+[resource]
+script = ExtResource("1_hero")
+content_id = &"debug_run_hero"
+display_name = "远征指挥官"
+starting_units = [ExtResource("2_unit")]
+art_pool = [ExtResource("3_art")]
+

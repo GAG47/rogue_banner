@@ -83,7 +83,7 @@ func _refresh_side(
 		for buff: BuffState in expired_buffs:
 			events.append(
 					BuffRemovedEvent.create(
-							buff.source_unit_id,
+							buff.source,
 							unit.instance_id,
 							buff.definition
 					)

@@ -10,6 +10,9 @@ func _init() -> void:
 	ArtEffectSystemTest.run(suite)
 	EnemyIntentSystemTest.run(suite)
 	BattleDebugSceneTest.run(suite)
+	RunRewardSystemTest.run(suite)
+	RunFlowSystemTest.run(suite)
+	RunDebugSceneTest.run(suite)
 
 	if suite.passed():
 		print("PASS: %d project assertions." % suite.assertion_count)

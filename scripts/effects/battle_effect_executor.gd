@@ -33,23 +33,37 @@ func execute(
 	).plan_all([definition], context)
 	if not plan_result.is_valid:
 		return EffectResult.failure(GameEnums.EffectStatus.INVALID_DEFINITION)
-	return execute_plans(context.battle, context.actor_unit_id, plan_result.plans)
+	return execute_plans(
+			context.battle,
+			context.actor_unit_id,
+			plan_result.plans,
+			context.source
+	)
 
 
 func execute_plans(
 		battle: BattleState,
 		actor_unit_id: int,
-		plans: Array[EffectExecutionPlan]
+		plans: Array[EffectExecutionPlan],
+		source: BattleSource = null
 ) -> EffectResult:
 	if battle == null:
 		return EffectResult.failure(GameEnums.EffectStatus.INVALID_CONTEXT)
 
+	var effect_source: BattleSource = source
+	if effect_source == null and actor_unit_id > 0:
+		var actor: UnitState = battle.get_unit(actor_unit_id)
+		if actor != null:
+			effect_source = BattleSource.unit(actor_unit_id, actor.side)
+	if effect_source == null or not effect_source.is_valid():
+		return EffectResult.failure(GameEnums.EffectStatus.INVALID_CONTEXT)
 	var result: EffectResult = EffectResult.success()
 	for plan: EffectExecutionPlan in plans:
 		var step_result: EffectResult = _execute_plan(
 				battle,
 				actor_unit_id,
-				plan
+				plan,
+				effect_source
 		)
 		if not step_result.succeeded():
 			return step_result
@@ -63,20 +77,21 @@ func execute_plans(
 func _execute_plan(
 		battle: BattleState,
 		actor_unit_id: int,
-		plan: EffectExecutionPlan
+		plan: EffectExecutionPlan,
+		source: BattleSource
 ) -> EffectResult:
 	if plan == null or plan.definition == null:
 		return EffectResult.failure(GameEnums.EffectStatus.INVALID_DEFINITION)
 	if plan.definition is DamageEffectDefinition:
-		return _execute_damage(battle, actor_unit_id, plan)
+		return _execute_damage(battle, source, plan)
 	if plan.definition is HealingEffectDefinition:
-		return _execute_healing(battle, actor_unit_id, plan)
+		return _execute_healing(battle, source, plan)
 	if plan.definition is ShieldEffectDefinition:
-		return _execute_shield(battle, actor_unit_id, plan)
+		return _execute_shield(battle, source, plan)
 	if plan.definition is ApplyBuffEffectDefinition:
-		return _execute_apply_buff(battle, actor_unit_id, plan)
+		return _execute_apply_buff(battle, source, plan)
 	if plan.definition is RemoveBuffEffectDefinition:
-		return _execute_remove_buff(battle, actor_unit_id, plan)
+		return _execute_remove_buff(battle, source, plan)
 	if plan.definition is MoveEffectDefinition:
 		return _execute_move(battle, plan)
 	if plan.definition is ForcedMovementEffectDefinition:
@@ -86,7 +101,7 @@ func _execute_plan(
 
 func _execute_damage(
 		battle: BattleState,
-		actor_unit_id: int,
+		source: BattleSource,
 		plan: EffectExecutionPlan
 ) -> EffectResult:
 	var result: EffectResult = EffectResult.success()
@@ -107,7 +122,7 @@ func _execute_damage(
 		if absorbed > 0:
 			result.events.append(
 					ShieldChangedEvent.create(
-							actor_unit_id,
+							source,
 							target_id,
 							previous_shield,
 							target.current_shield
@@ -115,7 +130,7 @@ func _execute_damage(
 			)
 		result.events.append(
 				DamageAppliedEvent.create(
-						actor_unit_id,
+						source,
 						target_id,
 						plan.amount,
 						health_damage,
@@ -124,7 +139,7 @@ func _execute_damage(
 		)
 		if previous_health > 0 and target.current_health == 0:
 			result.events.append(
-					UnitDefeatedEvent.create(actor_unit_id, target_id)
+					UnitDefeatedEvent.create(source, target_id)
 			)
 		result.affected_unit_ids.append(target_id)
 	return result
@@ -132,7 +147,7 @@ func _execute_damage(
 
 func _execute_healing(
 		battle: BattleState,
-		actor_unit_id: int,
+		source: BattleSource,
 		plan: EffectExecutionPlan
 ) -> EffectResult:
 	var result: EffectResult = EffectResult.success()
@@ -150,7 +165,7 @@ func _execute_healing(
 		target.current_health = mini(maximum_health, target.current_health + plan.amount)
 		result.events.append(
 				HealingAppliedEvent.create(
-						actor_unit_id,
+						source,
 						target_id,
 						plan.amount,
 						target.current_health - previous_health
@@ -162,7 +177,7 @@ func _execute_healing(
 
 func _execute_shield(
 		battle: BattleState,
-		actor_unit_id: int,
+		source: BattleSource,
 		plan: EffectExecutionPlan
 ) -> EffectResult:
 	var result: EffectResult = EffectResult.success()
@@ -176,7 +191,7 @@ func _execute_shield(
 		target.current_shield += plan.amount
 		result.events.append(
 				ShieldChangedEvent.create(
-						actor_unit_id,
+						source,
 						target_id,
 						previous_shield,
 						target.current_shield
@@ -188,7 +203,7 @@ func _execute_shield(
 
 func _execute_apply_buff(
 		battle: BattleState,
-		actor_unit_id: int,
+		source: BattleSource,
 		plan: EffectExecutionPlan
 ) -> EffectResult:
 	var result: EffectResult = EffectResult.success()
@@ -205,13 +220,13 @@ func _execute_apply_buff(
 		var application: BuffApplicationResult = _buff_service.apply_buff(
 				target,
 				definition.buff,
-				actor_unit_id
+				source
 		)
 		if not application.succeeded:
 			return EffectResult.failure(GameEnums.EffectStatus.STATE_CHANGED)
 		result.events.append(
 				BuffAppliedEvent.create(
-						actor_unit_id,
+						source,
 						target_id,
 						definition.buff,
 						application.stacks
@@ -219,7 +234,7 @@ func _execute_apply_buff(
 		)
 		if previous_health > 0 and target.current_health == 0:
 			result.events.append(
-					UnitDefeatedEvent.create(actor_unit_id, target_id)
+					UnitDefeatedEvent.create(source, target_id)
 			)
 		result.affected_unit_ids.append(target_id)
 	return result
@@ -227,7 +242,7 @@ func _execute_apply_buff(
 
 func _execute_remove_buff(
 		battle: BattleState,
-		actor_unit_id: int,
+		source: BattleSource,
 		plan: EffectExecutionPlan
 ) -> EffectResult:
 	var result: EffectResult = EffectResult.success()
@@ -248,14 +263,14 @@ func _execute_remove_buff(
 		for buff: BuffState in removed:
 			result.events.append(
 					BuffRemovedEvent.create(
-							actor_unit_id,
+							source,
 							target_id,
 							buff.definition
 					)
 			)
 		if previous_health > 0 and target.current_health == 0:
 			result.events.append(
-					UnitDefeatedEvent.create(actor_unit_id, target_id)
+					UnitDefeatedEvent.create(source, target_id)
 			)
 		result.affected_unit_ids.append(target_id)
 	return result

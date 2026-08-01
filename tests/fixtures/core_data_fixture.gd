@@ -68,7 +68,20 @@ static func create() -> CoreDataFixture:
 	fixture.relic = RelicDefinition.new()
 	fixture.relic.content_id = &"training_standard"
 	fixture.relic.display_name = "Training Standard"
-	fixture.relic.passive_triggers.append(fixture.trigger)
+	var relic_condition: EventUnitSideConditionDefinition = (
+		EventUnitSideConditionDefinition.new()
+	)
+	relic_condition.event_unit_role = GameEnums.EventUnitRole.TARGET
+	var relic_effect: ShieldEffectDefinition = ShieldEffectDefinition.new()
+	relic_effect.target_source = (
+		GameEnums.EffectTargetSource.EVENT_TARGET_UNIT
+	)
+	relic_effect.flat_amount = 1
+	var relic_trigger: TriggerDefinition = TriggerDefinition.new()
+	relic_trigger.event_kind = GameEnums.BattleEventKind.DAMAGE_APPLIED
+	relic_trigger.conditions.append(relic_condition)
+	relic_trigger.effects.append(relic_effect)
+	fixture.relic.passive_triggers.append(relic_trigger)
 
 	fixture.scroll = ScrollDefinition.new()
 	fixture.scroll.content_id = &"training_scroll"

@@ -61,8 +61,14 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 			battle_context.actor_unit_id
 	)
 	var event_unit: UnitState = battle_context.battle.get_unit(event_unit_id)
-	if owner == null or event_unit == null:
+	if owner == null:
 		return ConditionResult.failure(GameEnums.ConditionStatus.INVALID_CONTEXT)
+	if event_unit == null:
+		return ConditionResult.failure()
 	if _relation_evaluator.matches(owner, event_unit, relation):
 		return ConditionResult.success()
 	return ConditionResult.failure()
+
+
+func requires_actor_unit() -> bool:
+	return true

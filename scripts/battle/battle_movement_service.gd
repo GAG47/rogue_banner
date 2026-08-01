@@ -42,7 +42,7 @@ func commit_path(
 			ap_cost,
 			path,
 			UnitMovedEvent.create(
-					unit_id,
+					BattleSource.unit(unit_id, unit.side),
 					current_position.value,
 					destination,
 					path

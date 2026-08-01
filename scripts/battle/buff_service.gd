@@ -13,7 +13,7 @@ func _init(attribute_calculator: AttributeCalculator = null) -> void:
 func apply_buff(
 		unit: UnitState,
 		definition: BuffDefinition,
-		source_unit_id: int
+		source: BattleSource
 ) -> BuffApplicationResult:
 	if unit == null or unit.is_defeated() or definition == null:
 		return BuffApplicationResult.failure()
@@ -31,7 +31,9 @@ func apply_buff(
 				existing.remaining_turns = definition.duration_turns
 			GameEnums.BuffStackingRule.REPLACE:
 				existing.stacks = 1
-				existing.source_unit_id = source_unit_id
+				existing.source = (
+					source.duplicate_state() if source != null else null
+				)
 				existing.remaining_turns = definition.duration_turns
 		_clamp_unit_values(unit)
 		return BuffApplicationResult.success(
@@ -43,7 +45,7 @@ func apply_buff(
 	var buff: BuffState = BuffState.create(
 			unit._allocate_buff_id(),
 			definition,
-			source_unit_id
+			source
 	)
 	if not unit._add_buff(buff):
 		return BuffApplicationResult.failure()

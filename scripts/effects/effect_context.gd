@@ -7,6 +7,7 @@ var targets: TargetSelection
 var resolved_targets: ResolvedTargetSet
 var source_art: ArtDefinition
 var event: BattleEvent
+var source: BattleSource
 
 
 static func create(
@@ -15,7 +16,8 @@ static func create(
 	target_selection: TargetSelection,
 	art_definition: ArtDefinition = null,
 	resolved_target_set: ResolvedTargetSet = null,
-	source_event: BattleEvent = null
+	source_event: BattleEvent = null,
+	effect_source: BattleSource = null
 ) -> EffectContext:
 	var context: EffectContext = EffectContext.new()
 	context.battle = battle_state
@@ -28,4 +30,13 @@ static func create(
 		)
 	context.source_art = art_definition
 	context.event = source_event
+	context.source = effect_source
+	if (
+		context.source == null
+		and battle_state != null
+		and actor_id > 0
+	):
+		var actor: UnitState = battle_state.get_unit(actor_id)
+		if actor != null:
+			context.source = BattleSource.unit(actor_id, actor.side)
 	return context

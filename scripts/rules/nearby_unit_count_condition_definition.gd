@@ -94,3 +94,7 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 			if count >= minimum_count
 			else ConditionResult.failure()
 	)
+
+
+func requires_actor_unit() -> bool:
+	return true

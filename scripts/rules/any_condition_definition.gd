@@ -58,5 +58,12 @@ func evaluate(context: ConditionContext) -> ConditionResult:
 	return ConditionResult.failure()
 
 
+func requires_actor_unit() -> bool:
+	for condition: ConditionDefinition in conditions:
+		if condition != null and condition.requires_actor_unit():
+			return true
+	return false
+
+
 func _child_path(field_path: StringName, index: int) -> StringName:
 	return StringName("%s.conditions[%d]" % [String(field_path), index])

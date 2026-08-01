@@ -197,8 +197,9 @@ static func _test_buff_stacking_and_attributes(suite: TestSuite) -> void:
 	var unit: UnitState = fixture.battle.get_unit(fixture.player_unit_id)
 	var calculator: AttributeCalculator = AttributeCalculator.new()
 	var buff_service: BuffService = BuffService.new(calculator)
-	buff_service.apply_buff(unit, fixture.attack_buff, unit.instance_id)
-	buff_service.apply_buff(unit, fixture.attack_buff, unit.instance_id)
+	var source: BattleSource = BattleSource.unit(unit.instance_id, unit.side)
+	buff_service.apply_buff(unit, fixture.attack_buff, source)
+	buff_service.apply_buff(unit, fixture.attack_buff, source)
 
 	suite.assert_int_equal(
 			2,
@@ -255,17 +256,22 @@ static func _test_art_loadout(suite: TestSuite) -> void:
 	unit_definition.slot_count = 1
 	var run_unit: RunUnitState = RunUnitState.create(1, unit_definition)
 	var service: ArtLoadoutService = ArtLoadoutService.new()
-	var installed: ArtLoadoutResult = service.install(run_unit, fixture.strike, 0)
+	var art: RunArtState = RunArtState.create(1, fixture.strike)
+	var installed: ArtLoadoutResult = service.install(run_unit, art, 0)
 	suite.assert_true(installed.succeeded(), "Valid Arts should install.")
 	suite.assert_int_equal(
 			GameEnums.ArtLoadoutCode.SLOT_OCCUPIED,
-			service.install(run_unit, fixture.guard, 0).code,
+			service.install(
+					run_unit,
+					RunArtState.create(2, fixture.guard),
+					0
+			).code,
 			"Occupied Art slots should reject installation."
 	)
-	var upgraded: ArtLoadoutResult = service.upgrade(run_unit, 0)
+	var upgraded: ArtLoadoutResult = service.upgrade(run_unit, art, 0)
 	suite.assert_true(upgraded.succeeded(), "Configured Art variants should upgrade.")
 	suite.assert_true(
-			run_unit.installed_arts[0] == fixture.upgraded_strike,
+			art.definition == fixture.upgraded_strike,
 			"Upgrades should replace the installed Definition reference."
 	)
 	suite.assert_true(
