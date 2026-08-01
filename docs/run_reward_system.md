@@ -25,7 +25,10 @@ chests, content unlocks, saves, meta progression, or production UI.
 - Runtime identity allocation and Reward generation count
 
 Battle receives copies through `BattleSetup`. Rewards change Run only through
-Run commands. UI reads state and submits service requests.
+Run commands. Public inventory queries return detached snapshots, while Run
+domain services use internal mutable access only inside a transaction. UI reads
+fresh snapshots and submits service requests; it must not retain a snapshot as
+a live reference across a Run state-version change.
 
 ```text
 Run UI
@@ -71,6 +74,11 @@ rules against its working copy, and commits once. A failed command discards the
 copy. Commits compare the captured Run state version, so a stale transaction
 cannot overwrite a later result.
 
+Run identity, seed, capacities, Gold, phase, inventories, sessions, offers, and
+counters are private state. Public Unit, Art, Relic, Scroll, session, and offer
+queries return detached state snapshots. Mutating a returned object therefore
+cannot bypass validation or create an unversioned authoritative change.
+
 Reward grants use the same command implementations inside the Reward
 transaction. Buying an item therefore commits price, payload, destination, and
 option status together.
@@ -113,9 +121,13 @@ not removed when a Battle Unit is defeated.
 ID sets. It rejects duplicates, missing entries, invalid health, changed initial
 quantities, and repeated application before writing any value.
 
-Victory applies the outcome and creates one saved pick-one offer in the same Run
-transaction. Failure applies health and Scroll consumption, clears the session,
-sets the Run to `ENDED`, and creates no Reward.
+Victory applies the outcome and attempts to create one saved pick-one offer in
+the same Run transaction. Runtime filtering may reduce a Battle offer below its
+authored maximum option count. If no candidate remains eligible, the outcome,
+health, and Scroll consumption still commit, the Battle session is cleared, and
+the Run returns directly to `READY` without an offer. Failure applies health and
+Scroll consumption, clears the session, sets the Run to `ENDED`, and creates no
+Reward.
 
 ## Typed Battle Sources
 
@@ -191,6 +203,17 @@ rank, and generation index. It:
 An illegal candidate is never selected and redrawn. The generated offer is
 stored in Run State, and reopening the view reads the same object.
 
+For Battle `PICK_ONE` offers, `option_count` is the authored maximum. Generation
+uses every currently eligible distinct payload up to that count, and an empty
+result is an explicit successful no-offer outcome. Other offer sources still
+require their configured count.
+
+`TAKE_ALL` selection uses a duplicate Run simulation. Each selected payload is
+granted to that simulation before the next candidate is evaluated, so team,
+Scroll, Relic, and other cumulative limits are checked for the complete set.
+Generation fails before storing an offer if the selected set cannot be granted
+atomically.
+
 Unlock filtering is intentionally deferred until the Phase 9 unlock system
 defines its authoritative state.
 
@@ -198,7 +221,8 @@ defines its authoritative state.
 
 - `PICK_ONE` grants one option, closes the others, clears the active offer, and
   returns the Run to `READY`.
-- `TAKE_ALL` grants all destination-free options in one transaction.
+- `TAKE_ALL` grants all destination-free options in one transaction. Generation
+  has already verified the options cumulatively against the same Run rules.
 - `PURCHASE_ANY` atomically spends Gold and grants each selected option. The
   offer remains active with per-option sold status until explicitly closed.
 

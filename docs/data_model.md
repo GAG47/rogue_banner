@@ -312,7 +312,12 @@ Run State v5 contains:
 `RunArtState` instances and installs their IDs. `RunTransaction` deep-copies all
 mutable Run state, records the source version, and rejects a stale commit.
 External systems submit `RunCommand` objects or use `RunFlowService`; they do
-not update inventories or Gold directly.
+not update inventories or Gold directly. Public inventory queries return
+detached Unit, Art, Relic, and Scroll snapshots. Only Run-domain transaction
+code receives mutable inventory objects, so a consumer cannot alter authority
+or bypass `state_version` by modifying a query result. Snapshot consumers must
+query again after the Run version changes rather than treating object identity
+as stable.
 
 ## Rule Contracts
 

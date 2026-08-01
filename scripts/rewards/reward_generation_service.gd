@@ -45,7 +45,18 @@ func generate_in_transaction(
 	for entry: RewardEntryDefinition in pool.entries:
 		if _is_eligible(run, entry, context):
 			candidates.append(entry)
-	if candidates.size() < pool.option_count:
+	var option_count: int = pool.option_count
+	if (
+		source == GameEnums.RewardSource.BATTLE
+		and pool.offer_rule == GameEnums.RewardOfferRule.PICK_ONE
+	):
+		option_count = mini(
+				option_count,
+				_count_unique_payloads(candidates)
+		)
+		if option_count == 0:
+			return RewardGenerationResult.empty_success()
+	elif _count_unique_payloads(candidates) < option_count:
 		return RewardGenerationResult.failure(
 				GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
 		)
@@ -57,18 +68,41 @@ func generate_in_transaction(
 	offer.generation_index = generation_index
 	var random: SeededRandomSource = SeededRandomSource.new(
 			_reward_seed(
-					run.run_seed,
+					run.get_run_seed(),
 					generation_index,
 					pool.content_id
 			)
 	)
 	var selected_keys: Array[String] = []
-	for option_index: int in range(pool.option_count):
+	var selection_state: RunState = run
+	if pool.offer_rule == GameEnums.RewardOfferRule.TAKE_ALL:
+		selection_state = run.duplicate_state()
+		if selection_state == null:
+			return RewardGenerationResult.failure(
+					GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
+			)
+	for option_index: int in range(option_count):
 		var selectable: Array[RewardEntryDefinition] = []
 		var weights: Array[float] = []
+		var selection_context: RewardGenerationContext = context
+		if selection_state != run:
+			selection_context = RewardGenerationContext.create(
+					selection_state,
+					context.source,
+					context.floor_number,
+					context.battle_rank,
+					context.generation_index
+			)
 		for entry: RewardEntryDefinition in candidates:
 			var key: String = _payload_key(entry.payload)
-			if selected_keys.has(key):
+			if (
+				selected_keys.has(key)
+				or not _is_eligible(
+						selection_state,
+						entry,
+						selection_context
+				)
+			):
 				continue
 			selectable.append(entry)
 			weights.append(entry.weight)
@@ -89,7 +123,31 @@ func generate_in_transaction(
 		option.price = selected.price
 		offer.options.append(option)
 		selected_keys.append(_payload_key(selected.payload))
+		if selection_state != run:
+			var simulated_grant: RunCommandResult = (
+				_grant_service.grant_in_transaction(
+						selection_state,
+						selected.payload
+				)
+			)
+			if not simulated_grant.succeeded():
+				return RewardGenerationResult.failure(
+						GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
+				)
 	return RewardGenerationResult.success(offer)
+
+
+func _count_unique_payloads(
+	entries: Array[RewardEntryDefinition]
+) -> int:
+	var keys: Array[String] = []
+	for entry: RewardEntryDefinition in entries:
+		if entry == null or entry.payload == null:
+			continue
+		var key: String = _payload_key(entry.payload)
+		if not keys.has(key):
+			keys.append(key)
+	return keys.size()
 
 
 func _is_eligible(

@@ -40,7 +40,7 @@ func apply_in_transaction(
 			return RunCommandResult.failure(
 					GameEnums.RunCommandCode.INVALID_BATTLE_OUTCOME
 			)
-		var unit: RunUnitState = run.get_unit(
+		var unit: RunUnitState = run._get_unit_mutable(
 				unit_outcome.source_run_unit_id
 		)
 		if (
@@ -70,7 +70,7 @@ func apply_in_transaction(
 			return RunCommandResult.failure(
 					GameEnums.RunCommandCode.INVALID_BATTLE_OUTCOME
 			)
-		var stack: ScrollStackState = run.get_scroll(
+		var stack: ScrollStackState = run._get_scroll_mutable(
 				scroll_outcome.source_run_stack_id
 		)
 		if (
@@ -90,11 +90,11 @@ func apply_in_transaction(
 		)
 
 	for unit_outcome: BattleUnitOutcome in outcome.unit_outcomes:
-		run.get_unit(
+		run._get_unit_mutable(
 			unit_outcome.source_run_unit_id
 		).current_health = unit_outcome.remaining_health
 	for scroll_outcome: BattleScrollOutcome in outcome.scroll_outcomes:
-		var stack: ScrollStackState = run.get_scroll(
+		var stack: ScrollStackState = run._get_scroll_mutable(
 				scroll_outcome.source_run_stack_id
 		)
 		stack.quantity = scroll_outcome.remaining_quantity

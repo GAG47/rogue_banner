@@ -274,7 +274,10 @@ func _resolve_terminal_battle(message: String) -> void:
 		return
 	_completed_battles += 1
 	_battle_action_step = 0
-	_set_feedback(message + " 请选择奖励。")
+	if result.offer != null:
+		_set_feedback(message + " 请选择奖励。")
+	else:
+		_set_feedback(message + " 当前没有可领取的奖励。")
 
 
 func _on_offer_option_pressed(button_index: int) -> void:
@@ -390,7 +393,8 @@ func _refresh_run_status() -> void:
 	var lines: Array[String] = [
 		"阶段：%s" % _run_phase_text(_run.get_phase()),
 		"金币：%d" % _run.get_gold(),
-		"队伍：%d / %d" % [_run.get_units().size(), _run.team_capacity],
+		"队伍：%d / %d"
+		% [_run.get_units().size(), _run.get_team_capacity()],
 	]
 	for unit: RunUnitState in _run.get_units():
 		var art_names: Array[String] = []

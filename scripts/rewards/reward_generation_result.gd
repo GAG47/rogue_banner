@@ -8,16 +8,25 @@ var offer: RewardOffer
 
 
 func succeeded() -> bool:
-	return (
-			failure_code == GameEnums.RunCommandCode.SUCCEEDED
-			and offer != null
-	)
+	return failure_code == GameEnums.RunCommandCode.SUCCEEDED
+
+
+func has_offer() -> bool:
+	return offer != null
 
 
 static func success(value: RewardOffer) -> RewardGenerationResult:
+	if value == null:
+		return null
 	var result: RewardGenerationResult = RewardGenerationResult.new()
 	result.failure_code = GameEnums.RunCommandCode.SUCCEEDED
 	result.offer = value
+	return result
+
+
+static func empty_success() -> RewardGenerationResult:
+	var result: RewardGenerationResult = RewardGenerationResult.new()
+	result.failure_code = GameEnums.RunCommandCode.SUCCEEDED
 	return result
 
 
@@ -27,4 +36,3 @@ static func failure(
 	var result: RewardGenerationResult = RewardGenerationResult.new()
 	result.failure_code = code
 	return result
-

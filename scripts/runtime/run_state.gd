@@ -1,10 +1,10 @@
 class_name RunState
 extends RefCounted
 
-var hero_definition: HeroDefinition
-var run_seed: int = 0
-var team_capacity: int = 4
-var scroll_slot_capacity: int = 3
+var _hero_definition: HeroDefinition
+var _run_seed: int = 0
+var _team_capacity: int = 4
+var _scroll_slot_capacity: int = 3
 var _phase: GameEnums.RunPhase = GameEnums.RunPhase.READY
 var _gold: int = 0
 var _units: Dictionary[int, RunUnitState] = {}
@@ -38,10 +38,10 @@ static func create_from_setup(setup: RunSetup) -> RunState:
 		return null
 
 	var state: RunState = RunState.new()
-	state.hero_definition = setup.hero_definition
-	state.run_seed = setup.seed
-	state.team_capacity = setup.team_capacity
-	state.scroll_slot_capacity = setup.scroll_slot_capacity
+	state._hero_definition = setup.hero_definition
+	state._run_seed = setup.seed
+	state._team_capacity = setup.team_capacity
+	state._scroll_slot_capacity = setup.scroll_slot_capacity
 	state._gold = setup.starting_gold
 
 	for unit_definition: UnitDefinition in setup.hero_definition.starting_units:
@@ -55,6 +55,22 @@ static func create_from_setup(setup: RunSetup) -> RunState:
 
 func get_phase() -> GameEnums.RunPhase:
 	return _phase
+
+
+func get_hero_definition() -> HeroDefinition:
+	return _hero_definition
+
+
+func get_run_seed() -> int:
+	return _run_seed
+
+
+func get_team_capacity() -> int:
+	return _team_capacity
+
+
+func get_scroll_slot_capacity() -> int:
+	return _scroll_slot_capacity
 
 
 func get_gold() -> int:
@@ -86,7 +102,8 @@ func get_active_offer() -> RewardOffer:
 
 
 func get_unit(unit_instance_id: int) -> RunUnitState:
-	return _units.get(unit_instance_id) as RunUnitState
+	var unit: RunUnitState = _get_unit_mutable(unit_instance_id)
+	return unit.duplicate_state() if unit != null else null
 
 
 func get_units() -> Array[RunUnitState]:
@@ -96,12 +113,13 @@ func get_units() -> Array[RunUnitState]:
 	ids.sort()
 	var result: Array[RunUnitState] = []
 	for unit_id: int in ids:
-		result.append(_units[unit_id])
+		result.append((_units[unit_id] as RunUnitState).duplicate_state())
 	return result
 
 
 func get_art(art_instance_id: int) -> RunArtState:
-	return _arts.get(art_instance_id) as RunArtState
+	var art: RunArtState = _get_art_mutable(art_instance_id)
+	return art.duplicate_state() if art != null else null
 
 
 func get_arts() -> Array[RunArtState]:
@@ -111,7 +129,7 @@ func get_arts() -> Array[RunArtState]:
 	ids.sort()
 	var result: Array[RunArtState] = []
 	for art_id: int in ids:
-		result.append(_arts[art_id])
+		result.append((_arts[art_id] as RunArtState).duplicate_state())
 	return result
 
 
@@ -124,7 +142,8 @@ func get_uninstalled_arts() -> Array[RunArtState]:
 
 
 func get_relic(relic_instance_id: int) -> RunRelicState:
-	return _relics.get(relic_instance_id) as RunRelicState
+	var relic: RunRelicState = _get_relic_mutable(relic_instance_id)
+	return relic.duplicate_state() if relic != null else null
 
 
 func get_relics() -> Array[RunRelicState]:
@@ -134,12 +153,13 @@ func get_relics() -> Array[RunRelicState]:
 	ids.sort()
 	var result: Array[RunRelicState] = []
 	for relic_id: int in ids:
-		result.append(_relics[relic_id])
+		result.append((_relics[relic_id] as RunRelicState).duplicate_state())
 	return result
 
 
 func get_scroll(stack_instance_id: int) -> ScrollStackState:
-	return _scrolls.get(stack_instance_id) as ScrollStackState
+	var stack: ScrollStackState = _get_scroll_mutable(stack_instance_id)
+	return stack.duplicate_state() if stack != null else null
 
 
 func get_scrolls() -> Array[ScrollStackState]:
@@ -149,7 +169,9 @@ func get_scrolls() -> Array[ScrollStackState]:
 	ids.sort()
 	var result: Array[ScrollStackState] = []
 	for stack_id: int in ids:
-		result.append(_scrolls[stack_id])
+		result.append(
+				(_scrolls[stack_id] as ScrollStackState).duplicate_state()
+		)
 	return result
 
 
@@ -176,14 +198,19 @@ func get_installed_art_definitions(
 func is_art_installed(art_instance_id: int) -> bool:
 	if art_instance_id <= 0:
 		return false
-	for unit: RunUnitState in get_units():
+	for unit: RunUnitState in _get_units_mutable():
 		if unit.installed_art_instance_ids.has(art_instance_id):
 			return true
 	return false
 
 
 func find_art_owner(art_instance_id: int) -> RunUnitState:
-	for unit: RunUnitState in get_units():
+	var unit: RunUnitState = _find_art_owner_mutable(art_instance_id)
+	return unit.duplicate_state() if unit != null else null
+
+
+func _find_art_owner_mutable(art_instance_id: int) -> RunUnitState:
+	for unit: RunUnitState in _get_units_mutable():
 		if unit.installed_art_instance_ids.has(art_instance_id):
 			return unit
 	return null
@@ -191,7 +218,7 @@ func find_art_owner(art_instance_id: int) -> RunUnitState:
 
 func count_available_units() -> int:
 	var count: int = 0
-	for unit: RunUnitState in get_units():
+	for unit: RunUnitState in _get_units_mutable():
 		if not unit.is_defeated():
 			count += 1
 	return count
@@ -199,7 +226,7 @@ func count_available_units() -> int:
 
 func count_relic_definition(definition: RelicDefinition) -> int:
 	var count: int = 0
-	for relic: RunRelicState in get_relics():
+	for relic: RunRelicState in _get_relics_mutable():
 		if relic.definition == definition:
 			count += 1
 	return count
@@ -207,7 +234,7 @@ func count_relic_definition(definition: RelicDefinition) -> int:
 
 func total_scroll_quantity(definition: ScrollDefinition) -> int:
 	var total: int = 0
-	for stack: ScrollStackState in get_scrolls():
+	for stack: ScrollStackState in _get_scrolls_mutable():
 		if stack.definition == definition:
 			total += stack.quantity
 	return total
@@ -222,23 +249,23 @@ func duplicate_state() -> RunState:
 func _copy_from(source: RunState) -> void:
 	if source == null:
 		return
-	hero_definition = source.hero_definition
-	run_seed = source.run_seed
-	team_capacity = source.team_capacity
-	scroll_slot_capacity = source.scroll_slot_capacity
+	_hero_definition = source._hero_definition
+	_run_seed = source._run_seed
+	_team_capacity = source._team_capacity
+	_scroll_slot_capacity = source._scroll_slot_capacity
 	_phase = source._phase
 	_gold = source._gold
 	_units.clear()
-	for unit: RunUnitState in source.get_units():
+	for unit: RunUnitState in source._get_units_mutable():
 		_units[unit.instance_id] = unit.duplicate_state()
 	_arts.clear()
-	for art: RunArtState in source.get_arts():
+	for art: RunArtState in source._get_arts_mutable():
 		_arts[art.instance_id] = art.duplicate_state()
 	_relics.clear()
-	for relic: RunRelicState in source.get_relics():
+	for relic: RunRelicState in source._get_relics_mutable():
 		_relics[relic.instance_id] = relic.duplicate_state()
 	_scrolls.clear()
-	for stack: ScrollStackState in source.get_scrolls():
+	for stack: ScrollStackState in source._get_scrolls_mutable():
 		_scrolls[stack.instance_id] = stack.duplicate_state()
 	_next_unit_instance_id = source._next_unit_instance_id
 	_next_art_instance_id = source._next_art_instance_id
@@ -288,6 +315,66 @@ func _set_active_offer(offer: RewardOffer) -> void:
 
 func _get_active_offer_mutable() -> RewardOffer:
 	return _active_offer
+
+
+func _get_unit_mutable(unit_instance_id: int) -> RunUnitState:
+	return _units.get(unit_instance_id) as RunUnitState
+
+
+func _get_units_mutable() -> Array[RunUnitState]:
+	var ids: Array[int] = []
+	for unit_id: int in _units:
+		ids.append(unit_id)
+	ids.sort()
+	var result: Array[RunUnitState] = []
+	for unit_id: int in ids:
+		result.append(_units[unit_id])
+	return result
+
+
+func _get_art_mutable(art_instance_id: int) -> RunArtState:
+	return _arts.get(art_instance_id) as RunArtState
+
+
+func _get_arts_mutable() -> Array[RunArtState]:
+	var ids: Array[int] = []
+	for art_id: int in _arts:
+		ids.append(art_id)
+	ids.sort()
+	var result: Array[RunArtState] = []
+	for art_id: int in ids:
+		result.append(_arts[art_id])
+	return result
+
+
+func _get_relic_mutable(relic_instance_id: int) -> RunRelicState:
+	return _relics.get(relic_instance_id) as RunRelicState
+
+
+func _get_relics_mutable() -> Array[RunRelicState]:
+	var ids: Array[int] = []
+	for relic_id: int in _relics:
+		ids.append(relic_id)
+	ids.sort()
+	var result: Array[RunRelicState] = []
+	for relic_id: int in ids:
+		result.append(_relics[relic_id])
+	return result
+
+
+func _get_scroll_mutable(stack_instance_id: int) -> ScrollStackState:
+	return _scrolls.get(stack_instance_id) as ScrollStackState
+
+
+func _get_scrolls_mutable() -> Array[ScrollStackState]:
+	var ids: Array[int] = []
+	for stack_id: int in _scrolls:
+		ids.append(stack_id)
+	ids.sort()
+	var result: Array[ScrollStackState] = []
+	for stack_id: int in ids:
+		result.append(_scrolls[stack_id])
+	return result
 
 
 func _change_gold(amount: int) -> bool:
@@ -344,7 +431,7 @@ func _add_unit(unit: RunUnitState) -> bool:
 		unit == null
 		or unit.instance_id <= 0
 		or _units.has(unit.instance_id)
-		or _units.size() >= team_capacity
+		or _units.size() >= _team_capacity
 	):
 		return false
 	_units[unit.instance_id] = unit
@@ -352,7 +439,7 @@ func _add_unit(unit: RunUnitState) -> bool:
 
 
 func _remove_unit(unit_instance_id: int) -> RunUnitState:
-	var unit: RunUnitState = get_unit(unit_instance_id)
+	var unit: RunUnitState = _get_unit_mutable(unit_instance_id)
 	if unit != null:
 		_units.erase(unit_instance_id)
 	return unit
@@ -366,7 +453,7 @@ func _add_art(art: RunArtState) -> bool:
 
 
 func _remove_art(art_instance_id: int) -> RunArtState:
-	var art: RunArtState = get_art(art_instance_id)
+	var art: RunArtState = _get_art_mutable(art_instance_id)
 	if art != null:
 		_arts.erase(art_instance_id)
 	return art
@@ -384,7 +471,7 @@ func _add_relic(relic: RunRelicState) -> bool:
 
 
 func _remove_relic(relic_instance_id: int) -> RunRelicState:
-	var relic: RunRelicState = get_relic(relic_instance_id)
+	var relic: RunRelicState = _get_relic_mutable(relic_instance_id)
 	if relic != null:
 		_relics.erase(relic_instance_id)
 	return relic
@@ -395,7 +482,7 @@ func _add_scroll_stack(stack: ScrollStackState) -> bool:
 		stack == null
 		or stack.instance_id <= 0
 		or _scrolls.has(stack.instance_id)
-		or _scrolls.size() >= scroll_slot_capacity
+		or _scrolls.size() >= _scroll_slot_capacity
 	):
 		return false
 	_scrolls[stack.instance_id] = stack
@@ -403,14 +490,14 @@ func _add_scroll_stack(stack: ScrollStackState) -> bool:
 
 
 func _remove_scroll_stack(stack_instance_id: int) -> ScrollStackState:
-	var stack: ScrollStackState = get_scroll(stack_instance_id)
+	var stack: ScrollStackState = _get_scroll_mutable(stack_instance_id)
 	if stack != null:
 		_scrolls.erase(stack_instance_id)
 	return stack
 
 
 func _create_unit_with_defaults(definition: UnitDefinition) -> bool:
-	if definition == null or _units.size() >= team_capacity:
+	if definition == null or _units.size() >= _team_capacity:
 		return false
 	var unit: RunUnitState = RunUnitState.create(
 			_allocate_unit_id(),

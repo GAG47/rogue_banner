@@ -128,17 +128,17 @@ func _recruit_unit(
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.INVALID_TARGET
 		)
-	if run.get_units().size() >= run.team_capacity:
+	if run._get_units_mutable().size() >= run.get_team_capacity():
 		return RunCommandResult.failure(GameEnums.RunCommandCode.TEAM_FULL)
 	var previous_ids: Array[int] = []
-	for unit: RunUnitState in run.get_units():
+	for unit: RunUnitState in run._get_units_mutable():
 		previous_ids.append(unit.instance_id)
 	if not run._create_unit_with_defaults(command.definition):
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.INTERNAL_FAILURE
 		)
 	var result: RunCommandResult = RunCommandResult.success()
-	for unit: RunUnitState in run.get_units():
+	for unit: RunUnitState in run._get_units_mutable():
 		if not previous_ids.has(unit.instance_id):
 			result.unit_instance_id = unit.instance_id
 			break
@@ -149,7 +149,7 @@ func _remove_unit(
 		run: RunState,
 		command: RemoveRunUnitCommand
 ) -> RunCommandResult:
-	var unit: RunUnitState = run.get_unit(command.unit_instance_id)
+	var unit: RunUnitState = run._get_unit_mutable(command.unit_instance_id)
 	if unit == null:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.UNIT_NOT_FOUND
@@ -196,8 +196,8 @@ func _install_art(
 		run: RunState,
 		command: InstallArtCommand
 ) -> RunCommandResult:
-	var unit: RunUnitState = run.get_unit(command.unit_instance_id)
-	var art: RunArtState = run.get_art(command.art_instance_id)
+	var unit: RunUnitState = run._get_unit_mutable(command.unit_instance_id)
+	var art: RunArtState = run._get_art_mutable(command.art_instance_id)
 	if unit == null:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.UNIT_NOT_FOUND
@@ -229,7 +229,7 @@ func _uninstall_art(
 		run: RunState,
 		command: UninstallArtCommand
 ) -> RunCommandResult:
-	var unit: RunUnitState = run.get_unit(command.unit_instance_id)
+	var unit: RunUnitState = run._get_unit_mutable(command.unit_instance_id)
 	if unit == null:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.UNIT_NOT_FOUND
@@ -252,7 +252,7 @@ func _forget_art(
 		run: RunState,
 		command: ForgetArtCommand
 ) -> RunCommandResult:
-	var art: RunArtState = run.get_art(command.art_instance_id)
+	var art: RunArtState = run._get_art_mutable(command.art_instance_id)
 	if art == null:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.ART_NOT_FOUND
@@ -271,7 +271,7 @@ func _upgrade_art(
 		run: RunState,
 		command: UpgradeArtCommand
 ) -> RunCommandResult:
-	var art: RunArtState = run.get_art(command.art_instance_id)
+	var art: RunArtState = run._get_art_mutable(command.art_instance_id)
 	if art == null:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.ART_NOT_FOUND
@@ -280,7 +280,7 @@ func _upgrade_art(
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.ART_RULE_REJECTED
 		)
-	var owner: RunUnitState = run.find_art_owner(art.instance_id)
+	var owner: RunUnitState = run._find_art_owner_mutable(art.instance_id)
 	if owner != null:
 		var slot_index: int = owner.installed_art_instance_ids.find(
 				art.instance_id
@@ -367,20 +367,21 @@ func _grant_scroll(
 				GameEnums.RunCommandCode.INVALID_AMOUNT
 		)
 	var available_capacity: int = 0
-	for stack: ScrollStackState in run.get_scrolls():
+	for stack: ScrollStackState in run._get_scrolls_mutable():
 		if stack.definition == command.definition:
 			available_capacity += (
 					command.definition.max_stack_size - stack.quantity
 			)
 	available_capacity += (
-			run.scroll_slot_capacity - run.get_scrolls().size()
+			run.get_scroll_slot_capacity()
+			- run._get_scrolls_mutable().size()
 	) * command.definition.max_stack_size
 	if available_capacity < command.quantity:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.SCROLL_CAPACITY_EXCEEDED
 		)
 	var remaining: int = command.quantity
-	for stack: ScrollStackState in run.get_scrolls():
+	for stack: ScrollStackState in run._get_scrolls_mutable():
 		if stack.definition != command.definition:
 			continue
 		var added: int = mini(
@@ -415,7 +416,7 @@ func _heal_unit(
 		run: RunState,
 		command: HealRunUnitCommand
 ) -> RunCommandResult:
-	var unit: RunUnitState = run.get_unit(command.unit_instance_id)
+	var unit: RunUnitState = run._get_unit_mutable(command.unit_instance_id)
 	if unit == null:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.UNIT_NOT_FOUND
@@ -439,7 +440,9 @@ func _consume_scroll(
 		run: RunState,
 		command: ConsumeScrollCommand
 ) -> RunCommandResult:
-	var stack: ScrollStackState = run.get_scroll(command.stack_instance_id)
+	var stack: ScrollStackState = run._get_scroll_mutable(
+			command.stack_instance_id
+	)
 	if stack == null:
 		return RunCommandResult.failure(
 				GameEnums.RunCommandCode.SCROLL_NOT_FOUND

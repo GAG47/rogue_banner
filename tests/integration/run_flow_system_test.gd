@@ -15,6 +15,7 @@ const SHOP_POOL_PATH: String = (
 
 static func run(suite: TestSuite) -> void:
 	_test_complete_cross_battle_flow(suite)
+	_test_victory_without_eligible_reward_completes(suite)
 	_test_failure_does_not_generate_reward(suite)
 	_test_relic_trigger_failure_rolls_back_action(suite)
 
@@ -272,8 +273,111 @@ static func _test_failure_does_not_generate_reward(
 		"Battle failure should end the current Run."
 	)
 	suite.assert_true(
-		run_state.get_active_offer() == null,
-		"Battle failure must not generate a victory reward."
+			run_state.get_active_offer() == null,
+			"Battle failure must not generate a victory reward."
+	)
+
+
+static func _test_victory_without_eligible_reward_completes(
+		suite: TestSuite
+) -> void:
+	var run_state: RunState = RunState.create_from_setup(
+			RunSetup.create(
+					load(HERO_PATH) as HeroDefinition,
+					20260803,
+					1,
+					3,
+					0
+			)
+	)
+	var scroll_definition: ScrollDefinition = load(
+			SCROLL_PATH
+	) as ScrollDefinition
+	RunCommandService.new().execute(
+			run_state,
+			GrantScrollCommand.create(scroll_definition, 1)
+	)
+	var unit_payload: UnitRewardDefinition = UnitRewardDefinition.new()
+	unit_payload.unit_definition = load(
+			"res://content/units/debug_run_recruit.tres"
+	) as UnitDefinition
+	var entry: RewardEntryDefinition = RewardEntryDefinition.new()
+	entry.payload = unit_payload
+	entry.allow_duplicate = true
+	var pool: RewardPoolDefinition = RewardPoolDefinition.new()
+	pool.content_id = &"full_team_battle_reward"
+	pool.offer_rule = GameEnums.RewardOfferRule.PICK_ONE
+	pool.option_count = 1
+	pool.entries.append(entry)
+	suite.assert_true(
+			DefinitionValidator.new().validate(pool).is_valid(),
+			"The unavailable battle pool should remain definition-valid."
+	)
+
+	var request: RunBattleStartRequest = _create_battle_request(run_state)
+	request.reward_pool = pool
+	var flow_service: RunFlowService = RunFlowService.new()
+	var start: RunFlowResult = flow_service.start_battle(run_state, request)
+	suite.assert_true(
+			start.succeeded(),
+			"A dynamically unavailable reward must not block Battle start."
+	)
+	var battle: BattleState = start.battle
+	var player: UnitState = battle.get_units_for_side(
+			GameEnums.BattleSide.PLAYER
+	)[0]
+	var enemy: UnitState = battle.get_units_for_side(
+			GameEnums.BattleSide.ENEMY
+	)[0]
+	var enemy_position: GridCoordinate = battle.grid.find_occupant(
+			GameEnums.GridOccupantKind.UNIT,
+			enemy.instance_id
+	)
+	var selection: TargetSelection = TargetSelection.new()
+	selection.cells.append(enemy_position.value)
+	var action: ActionExecutionResult = BattleActionService.new().execute(
+			battle,
+			UseScrollActionRequest.create(
+					player.instance_id,
+					battle.get_scrolls()[0].instance_id,
+					selection
+			)
+	)
+	suite.assert_true(
+			action.is_successful
+			and battle.phase == GameEnums.BattlePhase.VICTORY,
+			"The test Battle should reach victory before Run resolution."
+	)
+
+	var resolution: RunFlowResult = flow_service.resolve_battle(
+			run_state,
+			battle
+	)
+	suite.assert_true(
+			resolution.succeeded(),
+			"Victory must commit even when no reward remains eligible."
+	)
+	suite.assert_true(
+			resolution.offer == null
+			and run_state.get_active_offer() == null,
+			"An empty reward result should not create an unusable offer."
+	)
+	suite.assert_true(
+			run_state.get_phase() == GameEnums.RunPhase.READY,
+			"A rewardless victory should return the Run to ready."
+	)
+	suite.assert_true(
+			run_state.get_active_battle_session() == null,
+			"A rewardless victory must still clear the Battle session."
+	)
+	suite.assert_int_equal(
+			0,
+			run_state.total_scroll_quantity(scroll_definition),
+			"A rewardless victory must still write back Scroll consumption."
+	)
+	suite.assert_false(
+			flow_service.resolve_battle(run_state, battle).succeeded(),
+			"A rewardless victory outcome must still be one-time."
 	)
 
 

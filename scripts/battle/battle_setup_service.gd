@@ -39,7 +39,7 @@ func build(
 	var setup: BattleSetup = BattleSetup.new()
 	setup.battle_session_id = session_id
 	setup.source_run_version = run.get_state_version()
-	setup.battle_seed = _battle_seed(run.run_seed, session_id)
+	setup.battle_seed = _battle_seed(run.get_run_seed(), session_id)
 	setup.grid = request.grid.duplicate_state()
 	if setup.grid == null:
 		return BattleSetupResult.failure(
@@ -144,4 +144,3 @@ func build(
 
 func _battle_seed(run_seed: int, session_id: int) -> int:
 	return run_seed * 1103515245 + session_id * 12345
-

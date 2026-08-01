@@ -14,7 +14,11 @@ const SHOP_POOL_PATH: String = (
 
 static func run(suite: TestSuite) -> void:
 	_test_run_commands_are_atomic(suite)
+	_test_run_read_views_are_isolated(suite)
 	_test_reward_generation_is_deterministic(suite)
+	_test_battle_reward_generation_allows_dynamic_underfill(suite)
+	_test_take_all_generation_rejects_cumulative_capacity(suite)
+	_test_take_all_offer_is_collectively_grantable(suite)
 	_test_failed_purchase_preserves_offer(suite)
 	_test_team_capacity_failure_preserves_purchase(suite)
 	_test_reward_definitions_validate(suite)
@@ -106,6 +110,71 @@ static func _test_run_commands_are_atomic(suite: TestSuite) -> void:
 	)
 
 
+static func _test_run_read_views_are_isolated(suite: TestSuite) -> void:
+	var run_state: RunState = _create_run(60)
+	var command_service: RunCommandService = RunCommandService.new()
+	var scroll_definition: ScrollDefinition = load(
+			SCROLL_PATH
+	) as ScrollDefinition
+	var relic_definition: RelicDefinition = load(
+			"res://content/relics/debug_resolute_banner.tres"
+	) as RelicDefinition
+	command_service.execute(
+			run_state,
+			GrantScrollCommand.create(scroll_definition, 1)
+	)
+	command_service.execute(
+			run_state,
+			GrantRelicCommand.create(relic_definition)
+	)
+
+	var authoritative_unit: RunUnitState = run_state.get_units()[0]
+	var unit_view: RunUnitState = run_state.get_unit(
+			authoritative_unit.instance_id
+	)
+	var art_id: int = authoritative_unit.installed_art_instance_ids[0]
+	var art_view: RunArtState = run_state.get_art(art_id)
+	var stack_view: ScrollStackState = run_state.get_scrolls()[0]
+	var relic_view: RunRelicState = run_state.get_relics()[0]
+	var version_before: int = run_state.get_state_version()
+	unit_view.current_health = 999
+	unit_view.installed_art_instance_ids[0] = 0
+	art_view.definition = null
+	stack_view.quantity = 999
+	relic_view.definition = null
+
+	var current_unit: RunUnitState = run_state.get_unit(unit_view.instance_id)
+	suite.assert_int_equal(
+			authoritative_unit.current_health,
+			current_unit.current_health,
+			"Mutating a Unit read view must not change authoritative health."
+	)
+	suite.assert_int_equal(
+			art_id,
+			current_unit.installed_art_instance_ids[0],
+			"Mutating a Unit read view must not change authoritative slots."
+	)
+	suite.assert_true(
+			run_state.get_art(art_id).definition != null,
+			"Mutating an Art read view must not change owned Art state."
+	)
+	suite.assert_int_equal(
+			1,
+			run_state.get_scroll(stack_view.instance_id).quantity,
+			"Mutating a Scroll read view must not change inventory quantity."
+	)
+	suite.assert_true(
+			run_state.get_relic(relic_view.instance_id).definition
+			== relic_definition,
+			"Mutating a Relic read view must not change owned Relic state."
+	)
+	suite.assert_int_equal(
+			version_before,
+			run_state.get_state_version(),
+			"Read-view mutations must not create an unversioned Run change."
+	)
+
+
 static func _test_reward_generation_is_deterministic(
 		suite: TestSuite
 ) -> void:
@@ -144,6 +213,172 @@ static func _test_reward_generation_is_deterministic(
 			== _payload_key(second_offer.options[index].payload),
 			"Equal seeds and Run state should produce the same option order."
 		)
+
+
+static func _test_take_all_generation_rejects_cumulative_capacity(
+		suite: TestSuite
+) -> void:
+	var run_state: RunState = _create_run_with_capacity(0, 2, 3)
+	var pool: RewardPoolDefinition = _create_take_all_pool(
+			[
+				_create_unit_reward_entry(
+						load(
+								"res://content/units/debug_run_recruit.tres"
+						) as UnitDefinition
+				),
+				_create_unit_reward_entry(
+						load(
+								"res://content/units/debug_raider.tres"
+						) as UnitDefinition
+				),
+			]
+	)
+	suite.assert_true(
+			DefinitionValidator.new().validate(pool).is_valid(),
+			"The cumulative-capacity take-all pool should be definition-valid."
+	)
+	var transaction: RunTransaction = RunTransaction.begin(run_state)
+	var generation: RewardGenerationResult = (
+		RewardGenerationService.new().generate_in_transaction(
+				transaction.working_state,
+				pool,
+				GameEnums.RewardSource.RECRUITMENT,
+				1,
+				GameEnums.EnemyRank.STANDARD
+		)
+	)
+	suite.assert_false(
+			generation.succeeded(),
+			"Take-all generation must reject rewards that exceed capacity together."
+	)
+	suite.assert_true(
+			run_state.get_active_offer() == null,
+			"A collectively invalid take-all set must never become an active offer."
+	)
+	suite.assert_int_equal(
+			0,
+			run_state.get_reward_generation_count(),
+			"Discarded generation must not mutate the authoritative Run."
+	)
+
+
+static func _test_battle_reward_generation_allows_dynamic_underfill(
+		suite: TestSuite
+) -> void:
+	var run_state: RunState = _create_run_with_capacity(0, 1, 3)
+	var currency_payload: CurrencyRewardDefinition = (
+		CurrencyRewardDefinition.new()
+	)
+	currency_payload.amount = 5
+	var currency_entry: RewardEntryDefinition = RewardEntryDefinition.new()
+	currency_entry.payload = currency_payload
+	var unit_entry: RewardEntryDefinition = _create_unit_reward_entry(
+			load(
+					"res://content/units/debug_run_recruit.tres"
+			) as UnitDefinition
+	)
+	var healing_entry: RewardEntryDefinition = RewardEntryDefinition.new()
+	healing_entry.payload = HealingRewardDefinition.new()
+	var pool: RewardPoolDefinition = RewardPoolDefinition.new()
+	pool.content_id = &"underfilled_battle_pool"
+	pool.offer_rule = GameEnums.RewardOfferRule.PICK_ONE
+	pool.option_count = 3
+	pool.entries.assign([currency_entry, unit_entry, healing_entry])
+	suite.assert_true(
+			DefinitionValidator.new().validate(pool).is_valid(),
+			"The underfilled battle pool should be definition-valid."
+	)
+
+	var transaction: RunTransaction = RunTransaction.begin(run_state)
+	var generation: RewardGenerationResult = (
+		RewardGenerationService.new().generate_in_transaction(
+				transaction.working_state,
+				pool,
+				GameEnums.RewardSource.BATTLE,
+				1,
+				GameEnums.EnemyRank.STANDARD
+		)
+	)
+	suite.assert_true(
+			generation.succeeded() and generation.has_offer(),
+			"A Battle offer should generate from its remaining legal candidates."
+	)
+	suite.assert_int_equal(
+			1,
+			generation.offer.options.size(),
+			"A Battle offer may contain fewer options than its authored maximum."
+	)
+
+
+static func _test_take_all_offer_is_collectively_grantable(
+		suite: TestSuite
+) -> void:
+	var run_state: RunState = _create_run_with_capacity(0, 2, 3)
+	var currency_payload: CurrencyRewardDefinition = (
+		CurrencyRewardDefinition.new()
+	)
+	currency_payload.amount = 7
+	var currency_entry: RewardEntryDefinition = RewardEntryDefinition.new()
+	currency_entry.payload = currency_payload
+	var pool: RewardPoolDefinition = _create_take_all_pool(
+			[
+				_create_unit_reward_entry(
+						load(
+								"res://content/units/debug_run_recruit.tres"
+						) as UnitDefinition
+				),
+				currency_entry,
+			]
+	)
+	suite.assert_true(
+			DefinitionValidator.new().validate(pool).is_valid(),
+			"The collectively legal take-all pool should be definition-valid."
+	)
+	var transaction: RunTransaction = RunTransaction.begin(run_state)
+	var generation: RewardGenerationResult = (
+		RewardGenerationService.new().generate_in_transaction(
+				transaction.working_state,
+				pool,
+				GameEnums.RewardSource.RECRUITMENT,
+				1,
+				GameEnums.EnemyRank.STANDARD
+		)
+	)
+	suite.assert_true(
+			generation.succeeded() and generation.has_offer(),
+			"A collectively legal take-all set should generate an offer."
+	)
+	transaction.working_state._set_active_offer(generation.offer)
+	transaction.working_state._set_phase(
+			GameEnums.RunPhase.CHOOSING_REWARD
+	)
+	suite.assert_true(
+			transaction.commit(),
+			"A validated take-all offer should commit to the Run."
+	)
+	var offer: RewardOffer = run_state.get_active_offer()
+	var claim: RunCommandResult = RewardOfferService.new().take_all(
+			run_state,
+			offer.offer_id
+	)
+	suite.assert_true(
+			claim.succeeded(),
+			"Every generated take-all option should grant in one transaction."
+	)
+	suite.assert_int_equal(
+			2,
+			run_state.get_units().size(),
+			"The take-all Unit should consume the final team slot."
+	)
+	suite.assert_int_equal(
+			7,
+			run_state.get_gold(),
+			"The take-all Currency should grant with the Unit."
+	)
+	suite.assert_true(
+			run_state.get_phase() == GameEnums.RunPhase.READY,
+			"A successful take-all claim should return the Run to ready."
+	)
 
 
 static func _test_failed_purchase_preserves_offer(suite: TestSuite) -> void:
@@ -264,15 +499,45 @@ static func _test_reward_definitions_validate(suite: TestSuite) -> void:
 
 
 static func _create_run(gold: int) -> RunState:
+	return _create_run_with_capacity(gold, 4, 3)
+
+
+static func _create_run_with_capacity(
+	gold: int,
+	team_capacity: int,
+	scroll_capacity: int
+) -> RunState:
 	return RunState.create_from_setup(
 			RunSetup.create(
 					load(HERO_PATH) as HeroDefinition,
 					20260801,
-					4,
-					3,
+					team_capacity,
+					scroll_capacity,
 					gold
 			)
 	)
+
+
+static func _create_take_all_pool(
+	entries: Array[RewardEntryDefinition]
+) -> RewardPoolDefinition:
+	var pool: RewardPoolDefinition = RewardPoolDefinition.new()
+	pool.content_id = &"take_all_test_pool"
+	pool.offer_rule = GameEnums.RewardOfferRule.TAKE_ALL
+	pool.option_count = entries.size()
+	pool.entries.assign(entries)
+	return pool
+
+
+static func _create_unit_reward_entry(
+	definition: UnitDefinition
+) -> RewardEntryDefinition:
+	var payload: UnitRewardDefinition = UnitRewardDefinition.new()
+	payload.unit_definition = definition
+	var entry: RewardEntryDefinition = RewardEntryDefinition.new()
+	entry.payload = payload
+	entry.allow_duplicate = true
+	return entry
 
 
 static func _payload_key(payload: RewardPayloadDefinition) -> String:

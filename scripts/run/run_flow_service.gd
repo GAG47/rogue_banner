@@ -131,7 +131,11 @@ func resolve_battle(
 		if not generation.succeeded():
 			return RunFlowResult.failure(generation.failure_code)
 		generated_offer = generation.offer
-		working._set_active_offer(generated_offer)
+		if generated_offer != null:
+			working._set_active_offer(generated_offer)
+		else:
+			working._set_active_offer(null)
+			working._set_phase(GameEnums.RunPhase.READY)
 	else:
 		working._set_phase(GameEnums.RunPhase.ENDED)
 		working._set_active_offer(null)
@@ -177,6 +181,10 @@ func open_shop(
 	)
 	if not generation.succeeded():
 		return RunFlowResult.failure(generation.failure_code)
+	if not generation.has_offer():
+		return RunFlowResult.failure(
+				GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
+		)
 	working._set_active_offer(generation.offer)
 	working._set_phase(GameEnums.RunPhase.SHOPPING)
 	if not transaction.commit():

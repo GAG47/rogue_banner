@@ -31,6 +31,12 @@ Battle, Reward, and UI authority separate and transactional.
 - Added `RunFlowService` for Battle entry, outcome resolution, Reward creation,
   and shop entry.
 - Added static v5 debug content and a Chinese two-Battle Run debug scene.
+- Hardened public Run queries so Unit, Art, Relic, Scroll, session, and offer
+  reads are detached snapshots rather than mutable authoritative references.
+- Made Battle reward option counts tolerate runtime filtering and made an empty
+  victory reward complete without leaving the Run in Battle.
+- Added cumulative `TAKE_ALL` generation simulation so every stored set is
+  atomically grantable under team, Scroll, Relic, and other Run limits.
 
 ## Architecture Decisions
 
@@ -66,10 +72,13 @@ The v5 suites cover:
 - Relic trigger-chain rollback after internal failure
 - Failure outcome without Reward
 - Complete Chinese debug-scene progression
+- Run read-view mutation isolation and version preservation
+- Dynamically underfilled and empty Battle reward progression
+- Cumulative `TAKE_ALL` capacity rejection and successful atomic collection
 
 ## Verification Result
 
-- All 403 project assertions passed.
+- All 432 project assertions passed.
 - The v5 debug scene instantiated and ran headlessly without runtime errors.
 - The Godot 4.7.1 headless editor check completed with exit code zero.
 - `git diff --check` passed.

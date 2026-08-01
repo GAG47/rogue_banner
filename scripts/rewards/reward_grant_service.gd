@@ -34,7 +34,7 @@ func can_grant(
 	if payload is UnitRewardDefinition:
 		return (
 				(payload as UnitRewardDefinition).unit_definition != null
-				and run.get_units().size() < run.team_capacity
+				and run.get_units().size() < run.get_team_capacity()
 		)
 	if payload is HealingRewardDefinition:
 		for unit: RunUnitState in run.get_units():
@@ -174,7 +174,6 @@ func _can_add_scroll(
 		if stack.definition == payload.scroll_definition:
 			available += payload.scroll_definition.max_stack_size - stack.quantity
 	available += (
-			run.scroll_slot_capacity - run.get_scrolls().size()
+		run.get_scroll_slot_capacity() - run.get_scrolls().size()
 	) * payload.scroll_definition.max_stack_size
 	return available >= payload.quantity
-
