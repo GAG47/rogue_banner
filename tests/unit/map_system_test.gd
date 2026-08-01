@@ -110,6 +110,22 @@ static func _test_definition_and_deterministic_generation(
 		DefinitionValidator.new().validate(insufficient).is_valid(),
 		"Map validation should reject copy limits that cannot fill the graph."
 	)
+	var negative_minimum: MapDefinition = MapTestFactory.create_map(
+			MapTestFactory.create_event_node(false)
+	)
+	negative_minimum.node_pool[0].minimum_copies = -1
+	suite.assert_false(
+		DefinitionValidator.new().validate(negative_minimum).is_valid(),
+		"Map validation should reject negative minimum copy counts."
+	)
+	var negative_maximum: MapDefinition = MapTestFactory.create_map(
+			MapTestFactory.create_event_node(false)
+	)
+	negative_maximum.node_pool[0].maximum_copies = -1
+	suite.assert_false(
+		DefinitionValidator.new().validate(negative_maximum).is_valid(),
+		"Map validation should reject negative maximum copy counts."
+	)
 	var constrained: MapDefinition = MapTestFactory.create_map(
 			MapTestFactory.create_event_node(false),
 			2,
@@ -218,6 +234,82 @@ static func _test_encounter_building(suite: TestSuite) -> void:
 				2
 		).succeeded(),
 		"Players must deploy only inside authored deployment Cells."
+	)
+	var wall: TerrainDefinition = load(
+			"res://content/terrains/debug_wall.tres"
+	) as TerrainDefinition
+	var blocked_player: EncounterDefinition = MapTestFactory.create_encounter(
+			GameEnums.EnemyRank.STANDARD,
+			&"blocked_player"
+	)
+	var player_wall: BattlefieldTerrainPlacement = (
+		BattlefieldTerrainPlacement.new()
+	)
+	player_wall.coordinate = Vector2i(0, 0)
+	player_wall.terrain = wall
+	blocked_player.battlefield.terrain_overrides.append(player_wall)
+	suite.assert_false(
+		DefinitionValidator.new().validate(blocked_player).is_valid(),
+		"Authored player deployment Cells must use passable final Terrain."
+	)
+	suite.assert_false(
+		EncounterBuildService.new().build(
+				run_state,
+				blocked_player,
+				valid_request,
+				2
+		).succeeded(),
+		"Encounter building must reject blocked player deployment Cells."
+	)
+	var blocked_enemy: EncounterDefinition = MapTestFactory.create_encounter(
+			GameEnums.EnemyRank.STANDARD,
+			&"blocked_enemy"
+	)
+	var enemy_wall: BattlefieldTerrainPlacement = (
+		BattlefieldTerrainPlacement.new()
+	)
+	enemy_wall.coordinate = Vector2i(4, 0)
+	enemy_wall.terrain = wall
+	blocked_enemy.battlefield.terrain_overrides.append(enemy_wall)
+	suite.assert_false(
+		DefinitionValidator.new().validate(blocked_enemy).is_valid(),
+		"Authored Enemy spawn Cells must use passable final Terrain."
+	)
+	suite.assert_false(
+		EncounterBuildService.new().build(
+				run_state,
+				blocked_enemy,
+				valid_request,
+				2
+		).succeeded(),
+		"Encounter building must reject blocked Enemy spawn Cells."
+	)
+	var direct_request: RunBattleStartRequest = RunBattleStartRequest.new()
+	direct_request.grid = GridState.create(
+			5,
+			2,
+			load(MapTestFactory.TERRAIN_PATH) as TerrainDefinition
+	)
+	direct_request.grid.set_terrain(Vector2i(0, 0), wall)
+	direct_request.player_deployments.append(
+			RunUnitDeployment.create(unit_id, Vector2i(0, 0))
+	)
+	direct_request.enemy_deployments.append(
+			EnemyDeployment.create(
+					load(MapTestFactory.ENEMY_PATH) as EnemyDefinition,
+					Vector2i(4, 0)
+			)
+	)
+	direct_request.reward_pool = load(
+			MapTestFactory.BATTLE_POOL_PATH
+	) as RewardPoolDefinition
+	suite.assert_false(
+		BattleSetupService.new().build(
+				run_state,
+				direct_request,
+				1
+		).succeeded(),
+		"Generic Battle setup must reject deployment on blocked Terrain."
 	)
 
 

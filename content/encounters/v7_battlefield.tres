@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="BattlefieldDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/battlefield_definition.gd" id="1_battlefield"]
+[ext_resource type="Script" path="res://scripts/map/battlefield_terrain_placement.gd" id="2_placement"]
+[ext_resource type="Resource" path="res://content/terrains/debug_ground.tres" id="3_ground"]
+[ext_resource type="Resource" path="res://content/terrains/debug_difficult_ground.tres" id="4_difficult"]
+[ext_resource type="Resource" path="res://content/terrains/debug_wall.tres" id="5_wall"]
+
+[sub_resource type="Resource" id="Difficult_2_1"]
+script = ExtResource("2_placement")
+coordinate = Vector2i(2, 1)
+terrain = ExtResource("4_difficult")
+
+[sub_resource type="Resource" id="Difficult_2_2"]
+script = ExtResource("2_placement")
+coordinate = Vector2i(2, 2)
+terrain = ExtResource("4_difficult")
+
+[sub_resource type="Resource" id="Difficult_2_3"]
+script = ExtResource("2_placement")
+coordinate = Vector2i(2, 3)
+terrain = ExtResource("4_difficult")
+
+[sub_resource type="Resource" id="Difficult_4_0"]
+script = ExtResource("2_placement")
+coordinate = Vector2i(4, 0)
+terrain = ExtResource("4_difficult")
+
+[sub_resource type="Resource" id="Difficult_4_4"]
+script = ExtResource("2_placement")
+coordinate = Vector2i(4, 4)
+terrain = ExtResource("4_difficult")
+
+[sub_resource type="Resource" id="Wall_3_0"]
+script = ExtResource("2_placement")
+coordinate = Vector2i(3, 0)
+terrain = ExtResource("5_wall")
+
+[sub_resource type="Resource" id="Wall_3_4"]
+script = ExtResource("2_placement")
+coordinate = Vector2i(3, 4)
+terrain = ExtResource("5_wall")
+
+[resource]
+script = ExtResource("1_battlefield")
+content_id = &"v7_battlefield"
+display_name = "战术演练场"
+width = 7
+height = 5
+default_terrain = ExtResource("3_ground")
+terrain_overrides = [SubResource("Difficult_2_1"), SubResource("Difficult_2_2"), SubResource("Difficult_2_3"), SubResource("Difficult_4_0"), SubResource("Difficult_4_4"), SubResource("Wall_3_0"), SubResource("Wall_3_4")]
+player_deployment_cells = [Vector2i(0, 1), Vector2i(0, 2), Vector2i(0, 3), Vector2i(1, 1), Vector2i(1, 2), Vector2i(1, 3)]

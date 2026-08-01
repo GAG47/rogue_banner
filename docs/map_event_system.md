@@ -174,9 +174,11 @@ current node or Battle phase.
 ## Validation and Verification
 
 Definition validation covers Battlefield bounds, Terrain references,
-deployment overlap, Enemy spawns, Encounter rank, Reward rules, Map layer and
-pool constraints, node subtype agreement, Event IDs, Condition contexts,
-outcome weights, operation values, and Reward-pool placement.
+deployment overlap and passability, Enemy spawn passability, Encounter rank,
+Reward rules, Map layer and nonnegative pool-copy constraints, node subtype
+agreement, Event IDs, Condition contexts, outcome weights, operation values,
+and Reward-pool placement. Runtime Encounter and generic Battle setup also
+recheck deployment Cells against the final Grid.
 
 Tests cover deterministic graph generation, next-layer edges, read-view
 isolation, illegal advancement, deployment validation, Event rollback and

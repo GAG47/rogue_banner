@@ -48,6 +48,7 @@ func build(
 			or not battlefield.player_deployment_cells.has(
 					deployment.coordinate
 			)
+			or not grid.can_place_at(deployment.coordinate).succeeded()
 		):
 			return EncounterBuildResult.failure(
 					GameEnums.MapFlowCode.INVALID_DEPLOYMENT
@@ -62,7 +63,11 @@ func build(
 	request.battle_rank = definition.battle_rank
 	request.reward_pool = definition.reward_pool
 	for spawn: EnemySpawnDefinition in definition.enemy_spawns:
-		if spawn == null or used_cells.has(spawn.coordinate):
+		if (
+			spawn == null
+			or used_cells.has(spawn.coordinate)
+			or not grid.can_place_at(spawn.coordinate).succeeded()
+		):
 			return EncounterBuildResult.failure(
 					GameEnums.MapFlowCode.INVALID_DEPLOYMENT
 			)

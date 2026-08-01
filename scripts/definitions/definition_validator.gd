@@ -888,6 +888,10 @@ func _validate_battlefield(
 	var deployment_cells: Array[Vector2i] = []
 	for index: int in range(definition.player_deployment_cells.size()):
 		var coordinate: Vector2i = definition.player_deployment_cells[index]
+		var path: StringName = _indexed_path(
+				&"player_deployment_cells",
+				index
+		)
 		if (
 			not _coordinate_in_bounds(
 					coordinate,
@@ -898,11 +902,21 @@ func _validate_battlefield(
 		):
 			result.add_issue(
 					GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
-					_indexed_path(&"player_deployment_cells", index),
+					path,
 					"Deployment Cells must be unique and in bounds."
 			)
 		else:
 			deployment_cells.append(coordinate)
+			var terrain: TerrainDefinition = _battlefield_terrain_at(
+					definition,
+					coordinate
+			)
+			if terrain != null and terrain.blocks_movement:
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+						path,
+						"Deployment Cells require passable Terrain."
+				)
 
 
 func _validate_encounter(
@@ -961,6 +975,16 @@ func _validate_encounter(
 			)
 		else:
 			spawn_cells.append(spawn.coordinate)
+			var terrain: TerrainDefinition = _battlefield_terrain_at(
+					definition.battlefield,
+					spawn.coordinate
+			)
+			if terrain != null and terrain.blocks_movement:
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+						_child_path(path, &"coordinate"),
+						"Enemy spawn Cells require passable Terrain."
+				)
 	if _validate_reference(definition.reward_pool, &"reward_pool", result):
 		_append_prefixed_issues(
 				result,
@@ -1172,15 +1196,28 @@ func _validate_map(
 			)
 		):
 			_add_invalid_map(result, _child_path(path, &"minimum_layer"), "Map node layer bounds are invalid.")
+		if entry.minimum_copies < 0:
+			_add_invalid_map(
+					result,
+					_child_path(path, &"minimum_copies"),
+					"Minimum copies cannot be negative."
+			)
+		if entry.maximum_copies < 0:
+			_add_invalid_map(
+					result,
+					_child_path(path, &"maximum_copies"),
+					"Maximum copies cannot be negative."
+			)
 		if (
-			entry.maximum_copies > 0
+			entry.minimum_copies >= 0
+			and entry.maximum_copies > 0
 			and entry.minimum_copies > entry.maximum_copies
 		):
 			_add_invalid_map(result, _child_path(path, &"minimum_copies"), "Minimum copies cannot exceed maximum copies.")
-		minimum_total += entry.minimum_copies
+		minimum_total += maxi(0, entry.minimum_copies)
 		if entry.maximum_copies == 0:
 			has_unlimited_entry = true
-		else:
+		elif entry.maximum_copies > 0:
 			maximum_total += entry.maximum_copies
 	if (
 		minimum_total
@@ -1219,7 +1256,7 @@ func _validate_map(
 			layer_has_entry = true
 			if entry.maximum_copies == 0:
 				layer_has_unlimited_entry = true
-			else:
+			elif entry.maximum_copies > 0:
 				layer_maximum_total += entry.maximum_copies
 		if not layer_has_entry:
 			_add_invalid_map(
@@ -1252,7 +1289,7 @@ func _validate_map(
 					entry.minimum_layer >= interval_start
 					and maximum_layer <= interval_end
 				):
-					required_in_interval += entry.minimum_copies
+					required_in_interval += maxi(0, entry.minimum_copies)
 			if (
 				required_in_interval
 				> (interval_end - interval_start + 1)
@@ -1450,6 +1487,18 @@ func _coordinate_in_bounds(
 		and coordinate.x < width
 		and coordinate.y < height
 	)
+
+
+func _battlefield_terrain_at(
+	definition: BattlefieldDefinition,
+	coordinate: Vector2i
+) -> TerrainDefinition:
+	if definition == null:
+		return null
+	for placement: BattlefieldTerrainPlacement in definition.terrain_overrides:
+		if placement != null and placement.coordinate == coordinate:
+			return placement.terrain
+	return definition.default_terrain
 
 
 func _add_invalid_map(

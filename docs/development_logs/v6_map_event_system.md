@@ -35,6 +35,10 @@ Battle, Reward, Event, and Map authority as separate transactional systems.
   activities without weakening strict standalone generation.
 - Added Map unit and integration suites covering route, Event, Reward, shop,
   chest, Encounter, Boss, and transaction boundaries.
+- Added final-Terrain passability validation and runtime placement checks for
+  player deployments and Enemy spawns.
+- Rejected negative Map node minimum and maximum copy counts even when data is
+  created outside normal Inspector ranges.
 
 ## Architecture Decisions
 
@@ -65,6 +69,8 @@ The v6 suites cover:
 - Detached Map read views
 - Rejection of unknown and unreachable nodes
 - Legal and illegal player deployment
+- Blocked player deployment and Enemy spawn Terrain
+- Negative Map node copy-count configuration
 - Persistent Event outcome selection
 - Full Event rollback after a later operation failure
 - Retry against the same planned outcome
@@ -79,7 +85,7 @@ The v6 suites cover:
 
 ## Verification Result
 
-- All 562 project assertions passed.
+- All 569 project assertions passed.
 - The Godot 4.7.1 headless editor check completed with exit code zero.
 - `git diff --check` passed.
 - No `.tscn` file was created or modified.

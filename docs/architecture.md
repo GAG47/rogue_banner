@@ -22,6 +22,7 @@ res://
 ├── content/
 │   ├── arts/
 │   ├── buffs/
+│   ├── encounters/
 │   ├── enemies/
 │   ├── heroes/
 │   ├── intents/
@@ -125,6 +126,7 @@ cycle with a global manager.
 | Generated route, current node, and node status | Map state stored by Run state | Map flow and Map read model |
 | Current Map activity and downstream provenance | Map node session | Map flow, Battle session, and Reward offer validation |
 | Sampled Event choice and outcome | Map Event session | Event execution and Map read model |
+| Formal Battle presentation snapshot | Detached Battle read model | Battle scene views |
 | Available authored content | Content catalog | Run setup, rewards, and persistence |
 
 Only an owning system may mutate its state. Other systems issue typed requests
@@ -156,6 +158,12 @@ Battle never mutates the Run team directly.
 Scenes own visual composition and editor-authored node relationships. Scripts
 attached to scene nodes adapt input, rendering, animation, and system lifecycle.
 They do not become the authoritative source for gameplay state.
+
+Formal Battle views receive detached `BattleReadModel` objects. The scene
+controller may own the authoritative Battle lifecycle and submit typed requests,
+but it does not expose mutable `BattleState` or `UnitState` references to child
+views. Presentation selection, hover, and pending-target mode are UI state and
+never duplicate a gameplay fact.
 
 Fixed nodes are created manually in the Godot editor. Runtime code may create
 truly dynamic entities such as units, indicators, projectiles, and effects from

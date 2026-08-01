@@ -211,6 +211,24 @@ Gate:
 - Encounter, reward, and event systems remain separate.
 - Seeded maps are reproducible and validate reachability constraints.
 
+## Interim v7 Battle Presentation Milestone
+
+Before Phase 9, v7 introduces the first formal Battle presentation milestone.
+Its final boundary is recorded in `docs/battle_ui.md`. This milestone validates
+the usability of already completed Battle, Art, effect, Buff, and Intent systems
+without adding Map, Reward, or meta-progression UI.
+
+The v7 gate is:
+
+- A player can deploy, move, use Arts, inspect enemy Intents, end turns, reach a
+  terminal Battle result, and restart without debug controls.
+- UI views consume detached Battle read models and submit typed requests.
+- The formal interface displays empty-Cell aims, affected footprints, current
+  Pattern danger, AP, cooldowns, Buffs, and actionable failures.
+
+Map and Run presentation remain deferred; this is not an implementation of the
+full Phase 12 production interface.
+
 ## Phase 9: Heroes and Meta Progression
 
 Complete:

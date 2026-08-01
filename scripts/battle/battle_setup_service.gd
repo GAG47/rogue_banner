@@ -55,6 +55,9 @@ func build(
 			or deployment.run_unit_id <= 0
 			or used_run_ids.has(deployment.run_unit_id)
 			or used_coordinates.has(deployment.coordinate)
+			or not setup.grid.can_place_at(
+					deployment.coordinate
+			).succeeded()
 		):
 			return BattleSetupResult.failure(
 					GameEnums.RunCommandCode.INVALID_TARGET
@@ -93,6 +96,9 @@ func build(
 			deployment == null
 			or deployment.definition == null
 			or used_coordinates.has(deployment.coordinate)
+			or not setup.grid.can_place_at(
+					deployment.coordinate
+			).succeeded()
 			or not _validator.validate(deployment.definition).is_valid()
 		):
 			return BattleSetupResult.failure(
