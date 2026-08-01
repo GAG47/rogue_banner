@@ -44,9 +44,9 @@ func execute(
 
 
 func execute_in_transaction(
-		run: RunState,
-		command: RunCommand,
-		allow_offer_phase: bool = false
+	run: RunState,
+	command: RunCommand,
+	allow_progression_phase: bool = false
 ) -> RunCommandResult:
 	if run == null:
 		return RunCommandResult.failure(
@@ -55,10 +55,11 @@ func execute_in_transaction(
 	if (
 		run.get_phase() != GameEnums.RunPhase.READY
 		and not (
-			allow_offer_phase
+			allow_progression_phase
 			and run.get_phase() in [
 				GameEnums.RunPhase.CHOOSING_REWARD,
 				GameEnums.RunPhase.SHOPPING,
+				GameEnums.RunPhase.RESOLVING_MAP_NODE,
 			]
 		)
 	):
@@ -95,6 +96,8 @@ func execute_in_transaction(
 		return _consume_scroll(run, command as ConsumeScrollCommand)
 	if command is HealRunUnitCommand:
 		return _heal_unit(run, command as HealRunUnitCommand)
+	if command is DamageRunUnitCommand:
+		return _damage_unit(run, command as DamageRunUnitCommand)
 	return RunCommandResult.failure(
 			GameEnums.RunCommandCode.INVALID_COMMAND
 	)
@@ -456,6 +459,27 @@ func _consume_scroll(
 		run._remove_scroll_stack(stack.instance_id)
 	var result: RunCommandResult = RunCommandResult.success()
 	result.changed_quantity = -command.quantity
+	return result
+
+
+func _damage_unit(
+	run: RunState,
+	command: DamageRunUnitCommand
+) -> RunCommandResult:
+	var unit: RunUnitState = run._get_unit_mutable(command.unit_instance_id)
+	if unit == null:
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.UNIT_NOT_FOUND
+		)
+	if command.amount <= 0:
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.INVALID_AMOUNT
+		)
+	var previous_health: int = unit.current_health
+	unit.current_health = maxi(0, unit.current_health - command.amount)
+	var result: RunCommandResult = RunCommandResult.success()
+	result.unit_instance_id = unit.instance_id
+	result.changed_quantity = unit.current_health - previous_health
 	return result
 
 

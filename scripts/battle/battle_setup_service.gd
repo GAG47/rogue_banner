@@ -11,15 +11,16 @@ func _init(validator: DefinitionValidator = null) -> void:
 
 
 func build(
-		run: RunState,
-		request: RunBattleStartRequest,
-		session_id: int
+	run: RunState,
+	request: RunBattleStartRequest,
+	session_id: int,
+	required_phase: GameEnums.RunPhase = GameEnums.RunPhase.READY
 ) -> BattleSetupResult:
 	if run == null:
 		return BattleSetupResult.failure(
 				GameEnums.RunCommandCode.INVALID_RUN
 		)
-	if run.get_phase() != GameEnums.RunPhase.READY:
+	if run.get_phase() != required_phase:
 		return BattleSetupResult.failure(
 				GameEnums.RunCommandCode.INVALID_PHASE
 		)

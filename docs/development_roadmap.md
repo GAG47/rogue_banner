@@ -193,6 +193,9 @@ because no authoritative unlock state exists yet.
 
 ## Phase 8: Map and Events
 
+Implemented in v6. Final contracts and failure semantics are recorded in
+`docs/map_event_system.md`.
+
 Complete:
 
 - Route generation

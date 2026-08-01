@@ -1,0 +1,3 @@
+@abstract
+class_name MapEventOperationDefinition
+extends Resource

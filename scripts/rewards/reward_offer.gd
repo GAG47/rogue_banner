@@ -6,6 +6,7 @@ var source: GameEnums.RewardSource = GameEnums.RewardSource.BATTLE
 var rule: GameEnums.RewardOfferRule = GameEnums.RewardOfferRule.PICK_ONE
 var status: GameEnums.RewardOfferStatus = GameEnums.RewardOfferStatus.OPEN
 var generation_index: int = 0
+var progression_session_id: int = 0
 var options: Array[RewardOption] = []
 
 
@@ -23,7 +24,7 @@ func duplicate_state() -> RewardOffer:
 	copy.rule = rule
 	copy.status = status
 	copy.generation_index = generation_index
+	copy.progression_session_id = progression_session_id
 	for option: RewardOption in options:
 		copy.options.append(option.duplicate_state() if option != null else null)
 	return copy
-

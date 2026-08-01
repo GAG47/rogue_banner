@@ -18,11 +18,15 @@ func _init(
 
 
 func generate_in_transaction(
-		run: RunState,
-		pool: RewardPoolDefinition,
-		source: GameEnums.RewardSource,
-		floor_number: int,
-		battle_rank: GameEnums.EnemyRank
+	run: RunState,
+	pool: RewardPoolDefinition,
+	source: GameEnums.RewardSource,
+	floor_number: int,
+	battle_rank: GameEnums.EnemyRank,
+	mode: GameEnums.RewardGenerationMode = (
+		GameEnums.RewardGenerationMode.STRICT
+	),
+	progression_session_id: int = 0
 ) -> RewardGenerationResult:
 	if (
 		run == null
@@ -46,10 +50,11 @@ func generate_in_transaction(
 		if _is_eligible(run, entry, context):
 			candidates.append(entry)
 	var option_count: int = pool.option_count
-	if (
-		source == GameEnums.RewardSource.BATTLE
-		and pool.offer_rule == GameEnums.RewardOfferRule.PICK_ONE
-	):
+	var progression_safe: bool = (
+		mode == GameEnums.RewardGenerationMode.PROGRESSION_SAFE
+		or source == GameEnums.RewardSource.BATTLE
+	)
+	if progression_safe:
 		option_count = mini(
 				option_count,
 				_count_unique_payloads(candidates)
@@ -66,6 +71,7 @@ func generate_in_transaction(
 	offer.source = source
 	offer.rule = pool.offer_rule
 	offer.generation_index = generation_index
+	offer.progression_session_id = progression_session_id
 	var random: SeededRandomSource = SeededRandomSource.new(
 			_reward_seed(
 					run.get_run_seed(),
@@ -107,6 +113,8 @@ func generate_in_transaction(
 			selectable.append(entry)
 			weights.append(entry.weight)
 		if selectable.is_empty():
+			if progression_safe:
+				break
 			return RewardGenerationResult.failure(
 					GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
 			)
@@ -134,6 +142,8 @@ func generate_in_transaction(
 				return RewardGenerationResult.failure(
 						GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
 				)
+	if offer.options.is_empty():
+		return RewardGenerationResult.empty_success()
 	return RewardGenerationResult.success(offer)
 
 

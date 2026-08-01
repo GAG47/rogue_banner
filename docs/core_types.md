@@ -94,7 +94,8 @@ implemented set adds:
 - `RunArtState`, `RunRelicState`, Battle Relic state, and Battle Scroll state
 - Private Run inventories, runtime IDs, phases, sessions, offers, and optimistic
   Run transactions
-- Typed Run commands for Gold, Units, Arts, Relics, Scrolls, and healing
+- Typed Run commands for Gold, Units, Arts, Relics, Scrolls, healing, and
+  Map-event damage
 - `BattleSetup`, `BattleOutcome`, and one-time transactional outcome application
 - Typed Battle sources, Relic trigger binding, and `UseScrollActionRequest`
 - Reward payload, entry, and pool Definitions
@@ -102,7 +103,23 @@ implemented set adds:
 - Pick-one, take-all, and purchase-any offer transactions
 - `RunFlowService` orchestration across Battle, reward, shop, and Run phases
 
-Types outside the v1 through v5 implemented sets remain planned contracts.
+## Map and Event System v6
+
+Implemented v6 contracts are recorded in `docs/map_event_system.md`. The
+implemented set adds:
+
+- Map, typed node, Battlefield, Encounter, Event, and camp Definitions
+- Deterministic layered Map generation and validated forward connections
+- `MapState`, `MapNodeState`, `MapNodeSessionState`, and
+  `MapEventSessionState` inside Run transactions
+- `MapReadModel` with derived reachability, visibility, and current layer
+- `EncounterBuildService` and runtime player deployment requests
+- Generic Event Run operations and `MapEventConditionContext`
+- Persisted weighted Event outcomes with atomic execution retry
+- `MapFlowService` orchestration across Map, Battle, Reward, shop, chest,
+  Event, camp, and Run ending
+
+Types outside the v1 through v6 implemented sets remain planned contracts.
 
 ## Enums
 
@@ -126,15 +143,16 @@ Types outside the v1 through v5 implemented sets remain planned contracts.
 | `BattleEventKind` | Stable typed Battle event categories |
 | `EventUnitRole` | Source or target Unit in a typed Battle event |
 | `EventDataCapability` | Typed payload facts guaranteed by an event kind |
-| `ConditionContextKind` | Installation, action-use, event-trigger, or enemy-decision context |
+| `ConditionContextKind` | Installation, action-use, Battle trigger, enemy decision, Reward generation, or Map Event context |
 | `SideRelation` | Same or opposing side relative to a passive owner |
 | `TriggerSourceKind` | Stable Art, Buff, or Relic trigger source category |
 | `BattleSourceKind` | Unit, Relic, Scroll, or system effect and event origin |
-| `RunPhase` | Ready, in Battle, choosing reward, shopping, or ended |
+| `RunPhase` | Ready, preparing or running Battle, resolving Map node, choosing Reward, shopping, or ended |
+| `RunEndReason` | None, victory, defeat, or abandonment |
 | `RewardKind` | Currency, Art, Relic, Scroll, Unit, healing, or Art upgrade |
 | `RewardOfferRule` | Pick one, take all, or purchase any |
 | `RewardSource` | Battle, shop, recruitment, chest, or event origin |
-| `MapNodeKind` | Battle, elite, boss, shop, camp, chest, or event |
+| `MapNodeKind` | Start, Battle, elite, Boss, shop, camp, chest, or Event |
 | `ActionFailureCode` | Stable machine-readable action rejection categories |
 
 Enums are extended only when a new stable domain category exists. Content IDs
@@ -183,7 +201,7 @@ or any other per-run mutable value.
 | `RelicState` | Relic definition and per-run trigger or charge state |
 | `ScrollStackState` | Scroll definition and current quantity |
 | `RunState` | Hero, team, currency, relics, scrolls, progress, seed, and unlock view |
-| `MapState` | Generated nodes, connections, current node, and visited state |
+| `MapState` | Generated nodes, connections, current node, status facts, and active node session |
 
 Runtime state may expose read-only snapshots, but external systems must mutate it
 only through its owning command service.
@@ -326,11 +344,19 @@ unlock filtering remains deferred until the Phase 9 unlock state exists.
 
 | Type | Responsibility |
 | --- | --- |
-| `MapGenerationRequest` | Seed, floor rules, and required node constraints |
-| `MapNodeDefinition` | Static node category and encounter or service reference |
-| `MapNodeState` | Runtime visibility, visitation, and resolution state |
+| `MapDefinition` | Layer bounds, connection chance, start and Boss nodes, and weighted node pool |
+| `MapGenerationRequest` | Map Definition, Run seed, and generation index |
+| `MapNodeDefinition` | Typed static node category and Encounter or service reference |
+| `BattlefieldDefinition` | Grid size, Terrain layout, and legal deployment Cells |
+| `EncounterDefinition` | Battlefield, Enemy spawns, rank, and Battle Reward pool |
+| `MapEventDefinition` | Choices, Conditions, weighted outcomes, and generic Run operations |
+| `MapNodeState` | Stable generated identity, layer, selected content, and status fact |
 | `MapConnection` | Directed connection between node identities |
 | `MapAdvanceRequest` | Selected reachable destination |
+| `MapNodeSessionState` | Current node stage and downstream Battle, Reward, or Event provenance |
+| `MapEventSessionState` | Selected choice, saved outcome, Event stage, and Reward provenance |
+| `MapReadModel` | Detached nodes plus derived reachability, visibility, and current layer |
+| `MapFlowService` | Transactional route and downstream activity coordinator |
 | `SaveData` | Versioned serializable run snapshot |
 | `SaveVersion` | Schema version value |
 | `LoadResult` | Loaded state, migration outcome, warnings, or failure |

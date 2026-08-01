@@ -1,0 +1,4 @@
+class_name GrantRewardMapOperationDefinition
+extends MapEventOperationDefinition
+
+@export var payload: RewardPayloadDefinition

@@ -6,6 +6,7 @@ var _run_seed: int = 0
 var _team_capacity: int = 4
 var _scroll_slot_capacity: int = 3
 var _phase: GameEnums.RunPhase = GameEnums.RunPhase.READY
+var _end_reason: GameEnums.RunEndReason = GameEnums.RunEndReason.NONE
 var _gold: int = 0
 var _units: Dictionary[int, RunUnitState] = {}
 var _arts: Dictionary[int, RunArtState] = {}
@@ -17,10 +18,13 @@ var _next_relic_instance_id: int = 1
 var _next_scroll_stack_instance_id: int = 1
 var _next_battle_session_id: int = 1
 var _next_offer_id: int = 1
+var _next_progression_session_id: int = 1
 var _reward_generation_count: int = 0
+var _map_generation_count: int = 0
 var _state_version: int = 1
 var _active_battle_session: RunBattleSessionState
 var _active_offer: RewardOffer
+var _map_state: MapState
 
 
 static func create(hero: HeroDefinition, seed: int) -> RunState:
@@ -57,6 +61,10 @@ func get_phase() -> GameEnums.RunPhase:
 	return _phase
 
 
+func get_end_reason() -> GameEnums.RunEndReason:
+	return _end_reason
+
+
 func get_hero_definition() -> HeroDefinition:
 	return _hero_definition
 
@@ -83,6 +91,14 @@ func get_state_version() -> int:
 
 func get_reward_generation_count() -> int:
 	return _reward_generation_count
+
+
+func get_map_generation_count() -> int:
+	return _map_generation_count
+
+
+func get_map_state() -> MapState:
+	return _map_state.duplicate_state() if _map_state != null else null
 
 
 func get_active_battle_session() -> RunBattleSessionState:
@@ -254,6 +270,7 @@ func _copy_from(source: RunState) -> void:
 	_team_capacity = source._team_capacity
 	_scroll_slot_capacity = source._scroll_slot_capacity
 	_phase = source._phase
+	_end_reason = source._end_reason
 	_gold = source._gold
 	_units.clear()
 	for unit: RunUnitState in source._get_units_mutable():
@@ -273,7 +290,9 @@ func _copy_from(source: RunState) -> void:
 	_next_scroll_stack_instance_id = source._next_scroll_stack_instance_id
 	_next_battle_session_id = source._next_battle_session_id
 	_next_offer_id = source._next_offer_id
+	_next_progression_session_id = source._next_progression_session_id
 	_reward_generation_count = source._reward_generation_count
+	_map_generation_count = source._map_generation_count
 	_state_version = source._state_version
 	_active_battle_session = (
 		source._active_battle_session.duplicate_state()
@@ -283,6 +302,11 @@ func _copy_from(source: RunState) -> void:
 	_active_offer = (
 		source._active_offer.duplicate_state()
 		if source._active_offer != null
+		else null
+	)
+	_map_state = (
+		source._map_state.duplicate_state()
+		if source._map_state != null
 		else null
 	)
 
@@ -297,6 +321,18 @@ func _commit_from(source: RunState, expected_version: int) -> bool:
 
 func _set_phase(value: GameEnums.RunPhase) -> void:
 	_phase = value
+
+
+func _set_end_reason(value: GameEnums.RunEndReason) -> void:
+	_end_reason = value
+
+
+func _set_map_state(value: MapState) -> void:
+	_map_state = value
+
+
+func _get_map_state_mutable() -> MapState:
+	return _map_state
 
 
 func _set_active_battle_session(
@@ -420,9 +456,21 @@ func _allocate_offer_id() -> int:
 	return result
 
 
+func _allocate_progression_session_id() -> int:
+	var result: int = _next_progression_session_id
+	_next_progression_session_id += 1
+	return result
+
+
 func _advance_reward_generation() -> int:
 	var result: int = _reward_generation_count
 	_reward_generation_count += 1
+	return result
+
+
+func _advance_map_generation() -> int:
+	var result: int = _map_generation_count
+	_map_generation_count += 1
 	return result
 
 

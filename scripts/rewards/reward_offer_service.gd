@@ -11,10 +11,10 @@ func _init(grant_service: RewardGrantService = null) -> void:
 
 
 func claim_option(
-		run: RunState,
-		offer_id: int,
-		option_id: int,
-		destination: RewardGrantDestination = null
+	run: RunState,
+	offer_id: int,
+	option_id: int,
+	destination: RewardGrantDestination = null
 ) -> RunCommandResult:
 	var transaction: RunTransaction = RunTransaction.begin(run)
 	if transaction == null or transaction.working_state == null:
@@ -22,9 +22,38 @@ func claim_option(
 				GameEnums.RunCommandCode.INVALID_RUN
 		)
 	var working: RunState = transaction.working_state
-	var offer: RewardOffer = working._get_active_offer_mutable()
-	var validation: RunCommandResult = _validate_open_offer(
+	if _is_progression_offer(working, offer_id):
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.INVALID_PHASE
+		)
+	var result: RunCommandResult = claim_option_in_transaction(
 			working,
+			offer_id,
+			option_id,
+			destination
+	)
+	if not result.succeeded():
+		return result
+	if working._get_active_offer_mutable() == null:
+		working._set_phase(GameEnums.RunPhase.READY)
+	if not transaction.commit():
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.INTERNAL_FAILURE
+		)
+	return result
+
+
+func claim_option_in_transaction(
+	run: RunState,
+	offer_id: int,
+	option_id: int,
+	destination: RewardGrantDestination = null
+) -> RunCommandResult:
+	if run == null:
+		return RunCommandResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
+	var offer: RewardOffer = run._get_active_offer_mutable()
+	var validation: RunCommandResult = _validate_open_offer(
+			run,
 			offer,
 			offer_id
 	)
@@ -46,14 +75,14 @@ func claim_option(
 	if option.price > 0:
 		var payment: RunCommandResult = RunCommandService.new(
 		).execute_in_transaction(
-				working,
+				run,
 				ChangeGoldCommand.create(-option.price),
 				true
 		)
 		if not payment.succeeded():
 			return payment
 	var grant: RunCommandResult = _grant_service.grant_in_transaction(
-			working,
+			run,
 			option.payload,
 			destination
 	)
@@ -65,14 +94,9 @@ func claim_option(
 			if other != option:
 				other.status = GameEnums.RewardOptionStatus.CLOSED
 		offer.status = GameEnums.RewardOfferStatus.COMPLETED
-		working._set_active_offer(null)
-		working._set_phase(GameEnums.RunPhase.READY)
+		run._set_active_offer(null)
 	else:
 		option.status = GameEnums.RewardOptionStatus.SOLD
-	if not transaction.commit():
-		return RunCommandResult.failure(
-				GameEnums.RunCommandCode.INTERNAL_FAILURE
-		)
 	return grant
 
 
@@ -83,9 +107,30 @@ func take_all(run: RunState, offer_id: int) -> RunCommandResult:
 				GameEnums.RunCommandCode.INVALID_RUN
 		)
 	var working: RunState = transaction.working_state
-	var offer: RewardOffer = working._get_active_offer_mutable()
+	if _is_progression_offer(working, offer_id):
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.INVALID_PHASE
+		)
+	var result: RunCommandResult = take_all_in_transaction(working, offer_id)
+	if not result.succeeded():
+		return result
+	working._set_phase(GameEnums.RunPhase.READY)
+	if not transaction.commit():
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.INTERNAL_FAILURE
+		)
+	return result
+
+
+func take_all_in_transaction(
+	run: RunState,
+	offer_id: int
+) -> RunCommandResult:
+	if run == null:
+		return RunCommandResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
+	var offer: RewardOffer = run._get_active_offer_mutable()
 	var validation: RunCommandResult = _validate_open_offer(
-			working,
+			run,
 			offer,
 			offer_id
 	)
@@ -105,19 +150,14 @@ func take_all(run: RunState, offer_id: int) -> RunCommandResult:
 					GameEnums.RunCommandCode.OPTION_UNAVAILABLE
 			)
 		var grant: RunCommandResult = _grant_service.grant_in_transaction(
-				working,
+				run,
 				option.payload
 		)
 		if not grant.succeeded():
 			return grant
 		option.status = GameEnums.RewardOptionStatus.CLAIMED
 	offer.status = GameEnums.RewardOfferStatus.COMPLETED
-	working._set_active_offer(null)
-	working._set_phase(GameEnums.RunPhase.READY)
-	if not transaction.commit():
-		return RunCommandResult.failure(
-				GameEnums.RunCommandCode.INTERNAL_FAILURE
-		)
+	run._set_active_offer(null)
 	return RunCommandResult.success()
 
 
@@ -128,9 +168,33 @@ func close_offer(run: RunState, offer_id: int) -> RunCommandResult:
 				GameEnums.RunCommandCode.INVALID_RUN
 		)
 	var working: RunState = transaction.working_state
-	var offer: RewardOffer = working._get_active_offer_mutable()
-	var validation: RunCommandResult = _validate_open_offer(
+	if _is_progression_offer(working, offer_id):
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.INVALID_PHASE
+		)
+	var result: RunCommandResult = close_offer_in_transaction(
 			working,
+			offer_id
+	)
+	if not result.succeeded():
+		return result
+	working._set_phase(GameEnums.RunPhase.READY)
+	if not transaction.commit():
+		return RunCommandResult.failure(
+				GameEnums.RunCommandCode.INTERNAL_FAILURE
+		)
+	return result
+
+
+func close_offer_in_transaction(
+	run: RunState,
+	offer_id: int
+) -> RunCommandResult:
+	if run == null:
+		return RunCommandResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
+	var offer: RewardOffer = run._get_active_offer_mutable()
+	var validation: RunCommandResult = _validate_open_offer(
+			run,
 			offer,
 			offer_id
 	)
@@ -144,12 +208,7 @@ func close_offer(run: RunState, offer_id: int) -> RunCommandResult:
 	for option: RewardOption in offer.options:
 		if option.status == GameEnums.RewardOptionStatus.AVAILABLE:
 			option.status = GameEnums.RewardOptionStatus.CLOSED
-	working._set_active_offer(null)
-	working._set_phase(GameEnums.RunPhase.READY)
-	if not transaction.commit():
-		return RunCommandResult.failure(
-				GameEnums.RunCommandCode.INTERNAL_FAILURE
-		)
+	run._set_active_offer(null)
 	return RunCommandResult.success()
 
 
@@ -179,3 +238,13 @@ func _validate_open_offer(
 		)
 	return RunCommandResult.success()
 
+
+func _is_progression_offer(run: RunState, offer_id: int) -> bool:
+	if run == null or offer_id <= 0:
+		return false
+	var offer: RewardOffer = run.get_active_offer()
+	return (
+		offer != null
+		and offer.offer_id == offer_id
+		and offer.progression_session_id > 0
+	)

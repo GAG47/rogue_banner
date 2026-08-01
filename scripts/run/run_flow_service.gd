@@ -9,11 +9,11 @@ var _reward_generation_service: RewardGenerationService
 
 
 func _init(
-		setup_service: BattleSetupService = null,
-		setup_factory: BattleSetupFactory = null,
-		outcome_service: BattleOutcomeService = null,
-		outcome_applier: RunOutcomeApplier = null,
-		reward_generation_service: RewardGenerationService = null
+	setup_service: BattleSetupService = null,
+	setup_factory: BattleSetupFactory = null,
+	outcome_service: BattleOutcomeService = null,
+	outcome_applier: RunOutcomeApplier = null,
+	reward_generation_service: RewardGenerationService = null
 ) -> void:
 	_setup_service = setup_service
 	if _setup_service == null:
@@ -33,13 +33,30 @@ func _init(
 
 
 func start_battle(
-		run: RunState,
-		request: RunBattleStartRequest
+	run: RunState,
+	request: RunBattleStartRequest
 ) -> RunFlowResult:
 	var transaction: RunTransaction = RunTransaction.begin(run)
 	if transaction == null or transaction.working_state == null:
 		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
-	var working: RunState = transaction.working_state
+	var result: RunFlowResult = start_battle_in_transaction(
+			transaction.working_state,
+			request
+	)
+	if not result.succeeded():
+		return result
+	if not transaction.commit():
+		return RunFlowResult.failure(GameEnums.RunCommandCode.INTERNAL_FAILURE)
+	return result
+
+
+func start_battle_in_transaction(
+	run: RunState,
+	request: RunBattleStartRequest,
+	progression_session_id: int = 0
+) -> RunFlowResult:
+	if run == null:
+		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
 	if (
 		request == null
 		or request.reward_pool == null
@@ -49,14 +66,16 @@ func start_battle(
 		or request.reward_pool.offer_rule
 		!= GameEnums.RewardOfferRule.PICK_ONE
 	):
-		return RunFlowResult.failure(
-				GameEnums.RunCommandCode.INVALID_TARGET
-		)
-	var session_id: int = working._allocate_battle_session_id()
+		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_TARGET)
+	var required_phase: GameEnums.RunPhase = GameEnums.RunPhase.READY
+	if progression_session_id > 0:
+		required_phase = GameEnums.RunPhase.PREPARING_BATTLE
+	var session_id: int = run._allocate_battle_session_id()
 	var setup_result: BattleSetupResult = _setup_service.build(
-			working,
+			run,
 			request,
-			session_id
+			session_id,
+			required_phase
 	)
 	if not setup_result.succeeded():
 		return RunFlowResult.failure(setup_result.code)
@@ -68,6 +87,7 @@ func start_battle(
 
 	var session: RunBattleSessionState = RunBattleSessionState.new()
 	session.battle_session_id = session_id
+	session.progression_session_id = progression_session_id
 	session.floor_number = request.floor_number
 	session.battle_rank = request.battle_rank
 	session.reward_pool = request.reward_pool
@@ -75,21 +95,49 @@ func start_battle(
 		session.participant_run_unit_ids.append(unit.source_run_unit_id)
 	for stack: BattleScrollStackState in setup_result.setup.scrolls:
 		session.scroll_stack_ids.append(stack.source_run_stack_id)
-	working._set_active_battle_session(session)
-	working._set_active_offer(null)
-	working._set_phase(GameEnums.RunPhase.IN_BATTLE)
-	if not transaction.commit():
-		return RunFlowResult.failure(
-				GameEnums.RunCommandCode.INTERNAL_FAILURE
-		)
+	run._set_active_battle_session(session)
+	run._set_active_offer(null)
+	run._set_phase(GameEnums.RunPhase.IN_BATTLE)
 	var result: RunFlowResult = RunFlowResult.success()
 	result.battle = battle_start.battle
 	return result
 
 
 func resolve_battle(
-		run: RunState,
-		battle: BattleState
+	run: RunState,
+	battle: BattleState
+) -> RunFlowResult:
+	var transaction: RunTransaction = RunTransaction.begin(run)
+	if transaction == null or transaction.working_state == null:
+		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
+	var working: RunState = transaction.working_state
+	var active_session: RunBattleSessionState = (
+		working._get_active_battle_session_mutable()
+	)
+	if active_session != null and active_session.progression_session_id > 0:
+		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_PHASE)
+	var result: RunFlowResult = resolve_battle_in_transaction(working, battle)
+	if not result.succeeded():
+		return result
+	if result.outcome.is_victory():
+		working._set_active_offer(result.offer)
+		working._set_phase(
+				GameEnums.RunPhase.CHOOSING_REWARD
+				if result.offer != null
+				else GameEnums.RunPhase.READY
+		)
+	else:
+		working._set_active_offer(null)
+		working._set_phase(GameEnums.RunPhase.ENDED)
+		working._set_end_reason(GameEnums.RunEndReason.DEFEAT)
+	if not transaction.commit():
+		return RunFlowResult.failure(GameEnums.RunCommandCode.INTERNAL_FAILURE)
+	return result
+
+
+func resolve_battle_in_transaction(
+	run: RunState,
+	battle: BattleState
 ) -> RunFlowResult:
 	if run == null:
 		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
@@ -98,19 +146,15 @@ func resolve_battle(
 	)
 	if not outcome_result.succeeded():
 		return RunFlowResult.failure(outcome_result.code)
-	var transaction: RunTransaction = RunTransaction.begin(run)
-	if transaction == null or transaction.working_state == null:
-		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
-	var working: RunState = transaction.working_state
 	var session: RunBattleSessionState = (
-		working._get_active_battle_session_mutable()
+		run._get_active_battle_session_mutable()
 	)
 	if session == null:
 		return RunFlowResult.failure(
 				GameEnums.RunCommandCode.BATTLE_SESSION_MISMATCH
 		)
 	var apply_result: RunCommandResult = _outcome_applier.apply_in_transaction(
-			working,
+			run,
 			outcome_result.outcome
 	)
 	if not apply_result.succeeded():
@@ -118,53 +162,68 @@ func resolve_battle(
 
 	var generated_offer: RewardOffer
 	if outcome_result.outcome.is_victory():
-		working._set_phase(GameEnums.RunPhase.CHOOSING_REWARD)
 		var generation: RewardGenerationResult = (
 			_reward_generation_service.generate_in_transaction(
-					working,
+					run,
 					session.reward_pool,
 					GameEnums.RewardSource.BATTLE,
 					session.floor_number,
-					session.battle_rank
+					session.battle_rank,
+					GameEnums.RewardGenerationMode.PROGRESSION_SAFE,
+					session.progression_session_id
 			)
 		)
 		if not generation.succeeded():
 			return RunFlowResult.failure(generation.failure_code)
 		generated_offer = generation.offer
-		if generated_offer != null:
-			working._set_active_offer(generated_offer)
-		else:
-			working._set_active_offer(null)
-			working._set_phase(GameEnums.RunPhase.READY)
-	else:
-		working._set_phase(GameEnums.RunPhase.ENDED)
-		working._set_active_offer(null)
-	working._set_active_battle_session(null)
-	if not transaction.commit():
-		return RunFlowResult.failure(
-				GameEnums.RunCommandCode.INTERNAL_FAILURE
-		)
+	run._set_active_battle_session(null)
 	var result: RunFlowResult = RunFlowResult.success()
 	result.outcome = outcome_result.outcome
-	result.offer = (
-			generated_offer.duplicate_state()
-			if generated_offer != null
-			else null
-	)
+	result.offer = generated_offer
 	return result
 
 
 func open_shop(
-		run: RunState,
-		pool: RewardPoolDefinition,
-		floor_number: int
+	run: RunState,
+	pool: RewardPoolDefinition,
+	floor_number: int
 ) -> RunFlowResult:
 	var transaction: RunTransaction = RunTransaction.begin(run)
 	if transaction == null or transaction.working_state == null:
 		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_RUN)
 	var working: RunState = transaction.working_state
+	var result: RunFlowResult = open_shop_in_transaction(
+			working,
+			pool,
+			floor_number
+	)
+	if not result.succeeded() or result.offer == null:
+		return (
+			result
+			if not result.succeeded()
+			else RunFlowResult.failure(
+					GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
+			)
+		)
+	working._set_active_offer(result.offer)
+	working._set_phase(GameEnums.RunPhase.SHOPPING)
+	if not transaction.commit():
+		return RunFlowResult.failure(GameEnums.RunCommandCode.INTERNAL_FAILURE)
+	return result
+
+
+func open_shop_in_transaction(
+	run: RunState,
+	pool: RewardPoolDefinition,
+	floor_number: int,
+	progression_session_id: int = 0,
+	mode: GameEnums.RewardGenerationMode = (
+		GameEnums.RewardGenerationMode.STRICT
+	)
+) -> RunFlowResult:
 	if (
-		working.get_phase() != GameEnums.RunPhase.READY
+		run == null
+		or run.get_phase() != GameEnums.RunPhase.READY
 		or pool == null
 		or pool.offer_rule != GameEnums.RewardOfferRule.PURCHASE_ANY
 		or not DefinitionValidator.new().validate(pool).is_valid()
@@ -172,25 +231,17 @@ func open_shop(
 		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_PHASE)
 	var generation: RewardGenerationResult = (
 		_reward_generation_service.generate_in_transaction(
-				working,
+				run,
 				pool,
 				GameEnums.RewardSource.SHOP,
 				floor_number,
-				GameEnums.EnemyRank.STANDARD
+				GameEnums.EnemyRank.STANDARD,
+				mode,
+				progression_session_id
 		)
 	)
 	if not generation.succeeded():
 		return RunFlowResult.failure(generation.failure_code)
-	if not generation.has_offer():
-		return RunFlowResult.failure(
-				GameEnums.RunCommandCode.REWARD_GENERATION_FAILED
-		)
-	working._set_active_offer(generation.offer)
-	working._set_phase(GameEnums.RunPhase.SHOPPING)
-	if not transaction.commit():
-		return RunFlowResult.failure(
-				GameEnums.RunCommandCode.INTERNAL_FAILURE
-		)
 	var result: RunFlowResult = RunFlowResult.success()
-	result.offer = generation.offer.duplicate_state()
+	result.offer = generation.offer
 	return result

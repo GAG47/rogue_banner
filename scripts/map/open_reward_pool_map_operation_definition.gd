@@ -1,0 +1,4 @@
+class_name OpenRewardPoolMapOperationDefinition
+extends MapEventOperationDefinition
+
+@export var reward_pool: RewardPoolDefinition

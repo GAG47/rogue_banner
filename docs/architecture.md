@@ -80,7 +80,12 @@ Arts and Intents
     │   └── Grid
     └── Domain events
 
-Run, Rewards, and Map
+Map flow and progression
+├── Run and Reward transaction interfaces
+├── Encounter construction and Battle flow
+└── Map and Event Definitions
+
+Run and Rewards
 ├── Definitions
 ├── Content catalog
 └── Core types
@@ -117,6 +122,9 @@ cycle with a global manager.
 | Team, currency, owned Arts, relics, scrolls, and active offer | Run state | Rewards, map, persistence, and read models |
 | Battle-to-Run participant and inventory mapping | Run battle session | Battle setup, outcome validation, and Run flow |
 | Generated reward or shop inventory | Reward offer stored by Run state | Reward UI and reward grant service |
+| Generated route, current node, and node status | Map state stored by Run state | Map flow and Map read model |
+| Current Map activity and downstream provenance | Map node session | Map flow, Battle session, and Reward offer validation |
+| Sampled Event choice and outcome | Map Event session | Event execution and Map read model |
 | Available authored content | Content catalog | Run setup, rewards, and persistence |
 
 Only an owning system may mutate its state. Other systems issue typed requests

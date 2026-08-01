@@ -10,6 +10,11 @@ orchestration needed to enter another Battle.
 It does not implement route maps, node progression, random events, camps,
 chests, content unlocks, saves, meta progression, or production UI.
 
+Version 6 composes this boundary through transaction-internal methods described
+in `docs/map_event_system.md`. Standalone v5 entry points retain their original
+phase behavior; Map-owned calls attach a progression session and leave final
+node completion to `MapFlowService`.
+
 ## Authority and Dependency Direction
 
 `RunState` is the sole authority for:
@@ -23,6 +28,11 @@ chests, content unlocks, saves, meta progression, or production UI.
 - Active Battle session mapping
 - Active Reward or shop offer
 - Runtime identity allocation and Reward generation count
+
+Version 6 adds progression provenance to Battle sessions and Reward offers.
+These IDs correlate downstream work without making Battle or Reward depend on
+Map types. Standalone public resolution and offer methods reject nonzero
+progression IDs; only Map-owned transaction orchestration may complete them.
 
 Battle receives copies through `BattleSetup`. Rewards change Run only through
 Run commands. Public inventory queries return detached snapshots, while Run
@@ -67,7 +77,7 @@ to the derived uninstalled inventory.
 - Art grant, install, uninstall, forget, and upgrade
 - Relic grant and removal
 - Scroll grant and consumption
-- Unit healing
+- Unit healing and Map-event damage
 
 Every public command begins a `RunTransaction`, rechecks the current phase and
 rules against its working copy, and commits once. A failed command discards the

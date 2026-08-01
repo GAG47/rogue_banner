@@ -12,6 +12,8 @@ func _init() -> void:
 	BattleDebugSceneTest.run(suite)
 	RunRewardSystemTest.run(suite)
 	RunFlowSystemTest.run(suite)
+	MapSystemTest.run(suite)
+	MapFlowSystemTest.run(suite)
 	RunDebugSceneTest.run(suite)
 
 	if suite.passed():

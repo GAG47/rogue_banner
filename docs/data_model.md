@@ -27,6 +27,11 @@ Relic Battle triggers, deterministic Reward offers, shops, recruitment, and Run
 flow phases. The final v5 contracts are detailed in
 `docs/run_reward_system.md`.
 
+Map and Event system v6 extends it with deterministic route Definitions,
+Run-owned Map facts, persistent node and Event sessions, Encounter composition,
+and transactional Map orchestration. The final v6 contracts are detailed in
+`docs/map_event_system.md`.
+
 All Definition types are Godot `Resource` classes registered with `class_name`.
 All runtime State types are `RefCounted` classes created uniquely for a Run or
 Battle.
@@ -295,7 +300,7 @@ Battle state; it cannot mutate the plan.
 
 ### RunState
 
-Run State v5 contains:
+Run State v6 contains:
 
 - `HeroDefinition` reference
 - Run seed
@@ -304,8 +309,11 @@ Run State v5 contains:
 - Run-owned Unit, Art, Relic, and Scroll State indexed by runtime ID
 - Monotonic runtime, Battle session, and Reward offer ID allocators
 - Reward generation count
+- Map generation count and progression-session identity allocation
 - Current Battle session mapping
 - Current saved Reward offer
+- Current generated `MapState`
+- Explicit `RunEndReason`
 - Optimistic state version
 
 `RunState.create_from_setup` builds default Arts as ordinary owned
@@ -318,6 +326,21 @@ code receives mutable inventory objects, so a consumer cannot alter authority
 or bypass `state_version` by modifying a query result. Snapshot consumers must
 query again after the Run version changes rather than treating object identity
 as stable.
+
+### MapState and Map Sessions
+
+`MapState` stores generated node instances, directed connections, the current
+node, node status, and at most one active `MapNodeSessionState`. The state is
+copied as part of every `RunTransaction`; it is not a separate mutable store.
+
+Reachable nodes, visible nodes, and current layer are derived from saved facts.
+`MapNodeSessionState` correlates one entered node with its Battle session,
+Reward offer, or `MapEventSessionState`. Event sessions retain the selected
+choice and sampled outcome before executing any mutable Run operation.
+
+Definitions remain immutable references. Runtime node status, session stages,
+offer IDs, and Event progress never write back into `MapDefinition`,
+`MapEventDefinition`, or `EncounterDefinition` Resources.
 
 ## Rule Contracts
 

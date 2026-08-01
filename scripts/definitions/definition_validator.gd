@@ -34,6 +34,16 @@ func validate(definition: DefinitionResource) -> DefinitionValidationResult:
 		_validate_intent(definition as IntentDefinition, result)
 	elif definition is RewardPoolDefinition:
 		_validate_reward_pool(definition as RewardPoolDefinition, result)
+	elif definition is MapDefinition:
+		_validate_map(definition as MapDefinition, result)
+	elif definition is BattlefieldDefinition:
+		_validate_battlefield(definition as BattlefieldDefinition, result)
+	elif definition is EncounterDefinition:
+		_validate_encounter(definition as EncounterDefinition, result)
+	elif definition is MapEventDefinition:
+		_validate_map_event(definition as MapEventDefinition, result)
+	elif definition is MapNodeDefinition:
+		_validate_map_node(definition as MapNodeDefinition, result)
 	elif definition is TagDefinition:
 		pass
 	else:
@@ -806,6 +816,661 @@ func _add_invalid_reward(
 ) -> void:
 	result.add_issue(
 			GameEnums.DefinitionValidationCode.INVALID_REWARD,
+			field_path,
+			message
+	)
+
+
+func _validate_battlefield(
+	definition: BattlefieldDefinition,
+	result: DefinitionValidationResult
+) -> void:
+	if definition.width <= 0 or definition.height <= 0:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+				&"width",
+				"Battlefield dimensions must be positive."
+		)
+	if _validate_reference(
+		definition.default_terrain,
+		&"default_terrain",
+		result
+	):
+		_append_prefixed_issues(
+				result,
+				validate(definition.default_terrain),
+				&"default_terrain"
+		)
+	var override_cells: Array[Vector2i] = []
+	for index: int in range(definition.terrain_overrides.size()):
+		var placement: BattlefieldTerrainPlacement = (
+			definition.terrain_overrides[index]
+		)
+		var path: StringName = _indexed_path(&"terrain_overrides", index)
+		if placement == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					path,
+					"Terrain placements cannot be null."
+			)
+			continue
+		if (
+			not _coordinate_in_bounds(
+					placement.coordinate,
+					definition.width,
+					definition.height
+			)
+			or override_cells.has(placement.coordinate)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+					_child_path(path, &"coordinate"),
+					"Terrain placement coordinates must be unique and in bounds."
+			)
+		else:
+			override_cells.append(placement.coordinate)
+		if _validate_reference(
+			placement.terrain,
+			_child_path(path, &"terrain"),
+			result
+		):
+			_append_prefixed_issues(
+					result,
+					validate(placement.terrain),
+					_child_path(path, &"terrain")
+			)
+	if definition.player_deployment_cells.is_empty():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+				&"player_deployment_cells",
+				"Battlefields require at least one player deployment Cell."
+		)
+	var deployment_cells: Array[Vector2i] = []
+	for index: int in range(definition.player_deployment_cells.size()):
+		var coordinate: Vector2i = definition.player_deployment_cells[index]
+		if (
+			not _coordinate_in_bounds(
+					coordinate,
+					definition.width,
+					definition.height
+			)
+			or deployment_cells.has(coordinate)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+					_indexed_path(&"player_deployment_cells", index),
+					"Deployment Cells must be unique and in bounds."
+			)
+		else:
+			deployment_cells.append(coordinate)
+
+
+func _validate_encounter(
+	definition: EncounterDefinition,
+	result: DefinitionValidationResult
+) -> void:
+	if _validate_reference(definition.battlefield, &"battlefield", result):
+		_append_prefixed_issues(
+				result,
+				validate(definition.battlefield),
+				&"battlefield"
+		)
+	if definition.enemy_spawns.is_empty():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+				&"enemy_spawns",
+				"Encounters require at least one Enemy spawn."
+		)
+	var spawn_cells: Array[Vector2i] = []
+	for index: int in range(definition.enemy_spawns.size()):
+		var spawn: EnemySpawnDefinition = definition.enemy_spawns[index]
+		var path: StringName = _indexed_path(&"enemy_spawns", index)
+		if spawn == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					path,
+					"Enemy spawns cannot be null."
+			)
+			continue
+		if _validate_reference(
+			spawn.enemy_definition,
+			_child_path(path, &"enemy_definition"),
+			result
+		):
+			_append_prefixed_issues(
+					result,
+					validate(spawn.enemy_definition),
+					_child_path(path, &"enemy_definition")
+			)
+		if (
+			definition.battlefield == null
+			or not _coordinate_in_bounds(
+					spawn.coordinate,
+					definition.battlefield.width,
+					definition.battlefield.height
+			)
+			or spawn_cells.has(spawn.coordinate)
+			or definition.battlefield.player_deployment_cells.has(
+					spawn.coordinate
+			)
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+					_child_path(path, &"coordinate"),
+					"Enemy spawn Cells must be unique, in bounds, and outside deployment Cells."
+			)
+		else:
+			spawn_cells.append(spawn.coordinate)
+	if _validate_reference(definition.reward_pool, &"reward_pool", result):
+		_append_prefixed_issues(
+				result,
+				validate(definition.reward_pool),
+				&"reward_pool"
+		)
+		if (
+			definition.reward_pool.offer_rule
+			!= GameEnums.RewardOfferRule.PICK_ONE
+		):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
+					&"reward_pool",
+					"Encounter rewards must use the pick-one rule."
+			)
+
+
+func _validate_map_node(
+	definition: MapNodeDefinition,
+	result: DefinitionValidationResult
+) -> void:
+	if definition is EncounterMapNodeDefinition:
+		if definition.kind not in [
+			GameEnums.MapNodeKind.BATTLE,
+			GameEnums.MapNodeKind.ELITE,
+			GameEnums.MapNodeKind.BOSS,
+		]:
+			_add_invalid_map(result, &"kind", "Encounter node kind is invalid.")
+		var encounter_node: EncounterMapNodeDefinition = (
+			definition as EncounterMapNodeDefinition
+		)
+		if _validate_reference(encounter_node.encounter, &"encounter", result):
+			_append_prefixed_issues(
+					result,
+					validate(encounter_node.encounter),
+					&"encounter"
+			)
+			var expected_rank: GameEnums.EnemyRank = (
+				GameEnums.EnemyRank.STANDARD
+			)
+			if definition.kind == GameEnums.MapNodeKind.ELITE:
+				expected_rank = GameEnums.EnemyRank.ELITE
+			elif definition.kind == GameEnums.MapNodeKind.BOSS:
+				expected_rank = GameEnums.EnemyRank.BOSS
+			if encounter_node.encounter.battle_rank != expected_rank:
+				_add_invalid_map(
+						result,
+						&"encounter",
+						"Encounter rank must match its Map node kind."
+				)
+		return
+	if definition is ShopMapNodeDefinition:
+		var shop: ShopMapNodeDefinition = definition as ShopMapNodeDefinition
+		if definition.kind != GameEnums.MapNodeKind.SHOP:
+			_add_invalid_map(result, &"kind", "Shop node kind is invalid.")
+		_validate_map_reward_pool(
+				shop.reward_pool,
+				&"reward_pool",
+				GameEnums.RewardOfferRule.PURCHASE_ANY,
+				result
+		)
+		return
+	if definition is ChestMapNodeDefinition:
+		var chest: ChestMapNodeDefinition = definition as ChestMapNodeDefinition
+		if definition.kind != GameEnums.MapNodeKind.CHEST:
+			_add_invalid_map(result, &"kind", "Chest node kind is invalid.")
+		if _validate_reference(chest.reward_pool, &"reward_pool", result):
+			_append_prefixed_issues(
+					result,
+					validate(chest.reward_pool),
+					&"reward_pool"
+			)
+			if (
+				chest.reward_pool.offer_rule
+				== GameEnums.RewardOfferRule.PURCHASE_ANY
+			):
+				_add_invalid_map(
+						result,
+						&"reward_pool",
+						"Chest rewards cannot use purchase-any offers."
+				)
+		return
+	if definition is EventMapNodeDefinition:
+		var event_node: EventMapNodeDefinition = (
+			definition as EventMapNodeDefinition
+		)
+		if definition.kind != GameEnums.MapNodeKind.EVENT:
+			_add_invalid_map(result, &"kind", "Event node kind is invalid.")
+		if _validate_reference(
+			event_node.event_definition,
+			&"event_definition",
+			result
+		):
+			_append_prefixed_issues(
+					result,
+					validate(event_node.event_definition),
+					&"event_definition"
+			)
+		return
+	if definition is CampMapNodeDefinition:
+		var camp_node: CampMapNodeDefinition = definition as CampMapNodeDefinition
+		if definition.kind != GameEnums.MapNodeKind.CAMP:
+			_add_invalid_map(result, &"kind", "Camp node kind is invalid.")
+		if _validate_reference(
+			camp_node.camp_definition,
+			&"camp_definition",
+			result
+		):
+			_append_prefixed_issues(
+					result,
+					validate(camp_node.camp_definition),
+					&"camp_definition"
+			)
+		return
+	if definition.kind != GameEnums.MapNodeKind.START:
+		_add_invalid_map(
+				result,
+				&"kind",
+				"Generic Map nodes may only represent the start node."
+		)
+
+
+func _validate_map(
+	definition: MapDefinition,
+	result: DefinitionValidationResult
+) -> void:
+	if (
+		definition.layer_count <= 0
+		or definition.minimum_nodes_per_layer <= 0
+		or definition.maximum_nodes_per_layer
+		< definition.minimum_nodes_per_layer
+	):
+		_add_invalid_map(
+				result,
+				&"layer_count",
+				"Map layer and node-count bounds are invalid."
+		)
+	if (
+		not is_finite(definition.extra_connection_chance)
+		or definition.extra_connection_chance < 0.0
+		or definition.extra_connection_chance > 1.0
+	):
+		_add_invalid_map(
+				result,
+				&"extra_connection_chance",
+				"Extra connection chance must be between zero and one."
+		)
+	if _validate_reference(definition.start_node, &"start_node", result):
+		_append_prefixed_issues(
+				result,
+				validate(definition.start_node),
+				&"start_node"
+		)
+		if definition.start_node.kind != GameEnums.MapNodeKind.START:
+			_add_invalid_map(result, &"start_node", "Start node kind is invalid.")
+	if _validate_reference(definition.boss_node, &"boss_node", result):
+		_append_prefixed_issues(
+				result,
+				validate(definition.boss_node),
+				&"boss_node"
+		)
+		if definition.boss_node.kind != GameEnums.MapNodeKind.BOSS:
+			_add_invalid_map(result, &"boss_node", "Boss node kind is invalid.")
+	if definition.node_pool.is_empty():
+		_add_invalid_map(result, &"node_pool", "Map node pools cannot be empty.")
+	var minimum_total: int = 0
+	var maximum_total: int = 0
+	var has_unlimited_entry: bool = false
+	for index: int in range(definition.node_pool.size()):
+		var entry: MapNodePoolEntry = definition.node_pool[index]
+		var path: StringName = _indexed_path(&"node_pool", index)
+		if entry == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					path,
+					"Map node pool entries cannot be null."
+			)
+			continue
+		if _validate_reference(
+			entry.node_definition,
+			_child_path(path, &"node_definition"),
+			result
+		):
+			_append_prefixed_issues(
+					result,
+					validate(entry.node_definition),
+					_child_path(path, &"node_definition")
+			)
+			if entry.node_definition.kind in [
+				GameEnums.MapNodeKind.START,
+				GameEnums.MapNodeKind.BOSS,
+			]:
+				_add_invalid_map(
+						result,
+						_child_path(path, &"node_definition"),
+						"Start and Boss nodes cannot appear in the random pool."
+				)
+		if not is_finite(entry.weight) or entry.weight <= 0.0:
+			_add_invalid_map(result, _child_path(path, &"weight"), "Map node weight must be positive.")
+		if (
+			entry.minimum_layer <= 0
+			or entry.minimum_layer > definition.layer_count
+			or (
+				entry.maximum_layer > 0
+				and (
+					entry.maximum_layer < entry.minimum_layer
+					or entry.maximum_layer > definition.layer_count
+				)
+			)
+		):
+			_add_invalid_map(result, _child_path(path, &"minimum_layer"), "Map node layer bounds are invalid.")
+		if (
+			entry.maximum_copies > 0
+			and entry.minimum_copies > entry.maximum_copies
+		):
+			_add_invalid_map(result, _child_path(path, &"minimum_copies"), "Minimum copies cannot exceed maximum copies.")
+		minimum_total += entry.minimum_copies
+		if entry.maximum_copies == 0:
+			has_unlimited_entry = true
+		else:
+			maximum_total += entry.maximum_copies
+	if (
+		minimum_total
+		> definition.layer_count * definition.minimum_nodes_per_layer
+	):
+		_add_invalid_map(
+				result,
+				&"node_pool",
+				"Required Map node copies exceed the minimum generated capacity."
+		)
+	if (
+		not has_unlimited_entry
+		and maximum_total
+		< definition.layer_count * definition.maximum_nodes_per_layer
+	):
+		_add_invalid_map(
+				result,
+				&"node_pool",
+				"Map node copy limits cannot fill the maximum generated capacity."
+		)
+	for layer_number: int in range(1, definition.layer_count + 1):
+		var layer_has_entry: bool = false
+		var layer_has_unlimited_entry: bool = false
+		var layer_maximum_total: int = 0
+		for entry: MapNodePoolEntry in definition.node_pool:
+			if entry == null or entry.node_definition == null:
+				continue
+			if (
+				layer_number < entry.minimum_layer
+				or (
+					entry.maximum_layer > 0
+					and layer_number > entry.maximum_layer
+				)
+			):
+				continue
+			layer_has_entry = true
+			if entry.maximum_copies == 0:
+				layer_has_unlimited_entry = true
+			else:
+				layer_maximum_total += entry.maximum_copies
+		if not layer_has_entry:
+			_add_invalid_map(
+					result,
+					&"node_pool",
+					"Every generated layer requires an eligible node-pool entry."
+			)
+		elif (
+			not layer_has_unlimited_entry
+			and layer_maximum_total < definition.maximum_nodes_per_layer
+		):
+			_add_invalid_map(
+					result,
+					&"node_pool",
+					"Node copy limits cannot fill every Cell in a generated layer."
+			)
+	for interval_start: int in range(1, definition.layer_count + 1):
+		for interval_end: int in range(
+			interval_start,
+			definition.layer_count + 1
+		):
+			var required_in_interval: int = 0
+			for entry: MapNodePoolEntry in definition.node_pool:
+				if entry == null:
+					continue
+				var maximum_layer: int = entry.maximum_layer
+				if maximum_layer == 0:
+					maximum_layer = definition.layer_count
+				if (
+					entry.minimum_layer >= interval_start
+					and maximum_layer <= interval_end
+				):
+					required_in_interval += entry.minimum_copies
+			if (
+				required_in_interval
+				> (interval_end - interval_start + 1)
+				* definition.minimum_nodes_per_layer
+			):
+				_add_invalid_map(
+						result,
+						&"node_pool",
+						"Required node copies cannot fit their allowed layer interval."
+				)
+
+
+func _validate_map_event(
+	definition: MapEventDefinition,
+	result: DefinitionValidationResult
+) -> void:
+	if definition.choices.is_empty():
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+				&"choices",
+				"Map interactions require at least one choice."
+		)
+	var choice_ids: Array[StringName] = []
+	for choice_index: int in range(definition.choices.size()):
+		var choice: MapEventChoiceDefinition = definition.choices[choice_index]
+		var choice_path: StringName = _indexed_path(&"choices", choice_index)
+		if choice == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					choice_path,
+					"Map Event choices cannot be null."
+			)
+			continue
+		if choice.choice_id == &"" or choice_ids.has(choice.choice_id):
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+					_child_path(choice_path, &"choice_id"),
+					"Map Event choice IDs must be non-empty and unique."
+			)
+		else:
+			choice_ids.append(choice.choice_id)
+		_validate_conditions(
+				choice.conditions,
+				_child_path(choice_path, &"conditions"),
+				GameEnums.ConditionContextKind.MAP_EVENT,
+				result
+		)
+		if choice.outcomes.is_empty():
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+					_child_path(choice_path, &"outcomes"),
+					"Map Event choices require at least one outcome."
+			)
+		if definition is CampDefinition and choice.outcomes.size() != 1:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+					_child_path(choice_path, &"outcomes"),
+					"Camp choices require exactly one deterministic outcome."
+			)
+		var outcome_ids: Array[StringName] = []
+		for outcome_index: int in range(choice.outcomes.size()):
+			var outcome: MapEventOutcomeDefinition = choice.outcomes[outcome_index]
+			var outcome_path: StringName = _indexed_path(
+					_child_path(choice_path, &"outcomes"),
+					outcome_index
+			)
+			if outcome == null:
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+						outcome_path,
+						"Map Event outcomes cannot be null."
+				)
+				continue
+			if outcome.outcome_id == &"" or outcome_ids.has(outcome.outcome_id):
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+						_child_path(outcome_path, &"outcome_id"),
+						"Map Event outcome IDs must be non-empty and unique per choice."
+				)
+			else:
+				outcome_ids.append(outcome.outcome_id)
+			if not is_finite(outcome.weight) or outcome.weight <= 0.0:
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+						_child_path(outcome_path, &"weight"),
+						"Map Event outcome weights must be positive."
+				)
+			if outcome.operations.is_empty():
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+						_child_path(outcome_path, &"operations"),
+						"Map Event outcomes require at least one operation."
+				)
+			var reward_pool_count: int = 0
+			for operation_index: int in range(outcome.operations.size()):
+				var operation: MapEventOperationDefinition = (
+					outcome.operations[operation_index]
+				)
+				var operation_path: StringName = _indexed_path(
+						_child_path(outcome_path, &"operations"),
+						operation_index
+				)
+				_validate_map_operation(operation, operation_path, result)
+				if operation is OpenRewardPoolMapOperationDefinition:
+					reward_pool_count += 1
+					if operation_index != outcome.operations.size() - 1:
+						result.add_issue(
+								GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+								operation_path,
+								"Reward-pool operations must be the final Event operation."
+						)
+			if reward_pool_count > 1:
+				result.add_issue(
+						GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
+						outcome_path,
+						"Map Event outcomes may open at most one Reward pool."
+				)
+
+
+func _validate_map_operation(
+	operation: MapEventOperationDefinition,
+	field_path: StringName,
+	result: DefinitionValidationResult
+) -> void:
+	if operation == null:
+		result.add_issue(
+				GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+				field_path,
+				"Map Event operations cannot be null."
+		)
+		return
+	if operation is ChangeGoldMapOperationDefinition:
+		if (operation as ChangeGoldMapOperationDefinition).amount == 0:
+			_add_invalid_map_event(result, field_path, "Gold change cannot be zero.")
+	elif operation is HealUnitMapOperationDefinition:
+		if (operation as HealUnitMapOperationDefinition).amount <= 0:
+			_add_invalid_map_event(result, field_path, "Healing must be positive.")
+	elif operation is DamageUnitMapOperationDefinition:
+		if (operation as DamageUnitMapOperationDefinition).amount <= 0:
+			_add_invalid_map_event(result, field_path, "Damage must be positive.")
+	elif operation is ConsumeScrollMapOperationDefinition:
+		if (operation as ConsumeScrollMapOperationDefinition).quantity <= 0:
+			_add_invalid_map_event(result, field_path, "Scroll consumption must be positive.")
+	elif operation is RemoveRelicMapOperationDefinition:
+		pass
+	elif operation is GrantRewardMapOperationDefinition:
+		var grant: GrantRewardMapOperationDefinition = (
+			operation as GrantRewardMapOperationDefinition
+		)
+		if grant.payload == null:
+			result.add_issue(
+					GameEnums.DefinitionValidationCode.NULL_REFERENCE,
+					_child_path(field_path, &"payload"),
+					"Reward operations require a payload."
+			)
+		else:
+			_validate_reward_payload(grant.payload, _child_path(field_path, &"payload"), result)
+	elif operation is OpenRewardPoolMapOperationDefinition:
+		var open: OpenRewardPoolMapOperationDefinition = (
+			operation as OpenRewardPoolMapOperationDefinition
+		)
+		if _validate_reference(open.reward_pool, _child_path(field_path, &"reward_pool"), result):
+			_append_prefixed_issues(
+					result,
+					validate(open.reward_pool),
+					_child_path(field_path, &"reward_pool")
+			)
+			if open.reward_pool.offer_rule == GameEnums.RewardOfferRule.PURCHASE_ANY:
+				_add_invalid_map_event(result, field_path, "Event rewards cannot open a shop offer.")
+	else:
+		_add_invalid_map_event(result, field_path, "Map Event operation type is unsupported.")
+
+
+func _validate_map_reward_pool(
+	pool: RewardPoolDefinition,
+	field_path: StringName,
+	expected_rule: GameEnums.RewardOfferRule,
+	result: DefinitionValidationResult
+) -> void:
+	if not _validate_reference(pool, field_path, result):
+		return
+	_append_prefixed_issues(result, validate(pool), field_path)
+	if pool.offer_rule != expected_rule:
+		_add_invalid_map(result, field_path, "Reward pool rule does not match its Map node.")
+
+
+func _coordinate_in_bounds(
+	coordinate: Vector2i,
+	width: int,
+	height: int
+) -> bool:
+	return (
+		coordinate.x >= 0
+		and coordinate.y >= 0
+		and coordinate.x < width
+		and coordinate.y < height
+	)
+
+
+func _add_invalid_map(
+	result: DefinitionValidationResult,
+	field_path: StringName,
+	message: String
+) -> void:
+	result.add_issue(
+			GameEnums.DefinitionValidationCode.INVALID_MAP,
+			field_path,
+			message
+	)
+
+
+func _add_invalid_map_event(
+	result: DefinitionValidationResult,
+	field_path: StringName,
+	message: String
+) -> void:
+	result.add_issue(
+			GameEnums.DefinitionValidationCode.INVALID_MAP_EVENT,
 			field_path,
 			message
 	)

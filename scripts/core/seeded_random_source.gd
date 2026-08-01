@@ -24,3 +24,13 @@ func choose_weighted_index(weights: Array[float]) -> int:
 		if roll < accumulated:
 			return index
 	return weights.size() - 1
+
+
+func next_int(minimum: int, maximum: int) -> int:
+	if minimum > maximum:
+		return minimum
+	return _random.randi_range(minimum, maximum)
+
+
+func next_float() -> float:
+	return _random.randf()
