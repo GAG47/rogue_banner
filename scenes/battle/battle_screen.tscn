@@ -230,7 +230,7 @@ theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 18
 
-[node name="SideContent" type="VBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin" node_paths=PackedStringArray("deployment_panel", "deployment_progress_label", "deployment_next_unit_label", "start_battle_button", "reset_deployment_button", "battle_panel", "selected_unit_label", "status_effects_label", "art_selector", "art_detail_label", "use_art_button", "intent_label", "end_turn_button", "restart_battle_button")]
+[node name="SideContent" type="VBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin" node_paths=PackedStringArray("deployment_panel", "deployment_progress_label", "deployment_next_unit_label", "start_battle_button", "reset_deployment_button", "battle_panel", "selected_unit_label", "status_effects_label", "art_selector", "art_detail_label", "use_art_button", "intent_label", "relic_label", "scroll_selector", "scroll_detail_label", "use_scroll_button", "end_turn_button", "restart_battle_button")]
 layout_mode = 2
 theme_override_constants/separation = 12
 script = ExtResource("5_status")
@@ -246,6 +246,10 @@ art_selector = NodePath("BattlePanel/BattleScroll/BattleDetails/ArtSelector")
 art_detail_label = NodePath("BattlePanel/BattleScroll/BattleDetails/ArtDetailLabel")
 use_art_button = NodePath("BattlePanel/BattleScroll/BattleDetails/UseArtButton")
 intent_label = NodePath("BattlePanel/BattleScroll/BattleDetails/IntentLabel")
+relic_label = NodePath("BattlePanel/BattleScroll/BattleDetails/RelicLabel")
+scroll_selector = NodePath("BattlePanel/BattleScroll/BattleDetails/ScrollSelector")
+scroll_detail_label = NodePath("BattlePanel/BattleScroll/BattleDetails/ScrollDetailLabel")
+use_scroll_button = NodePath("BattlePanel/BattleScroll/BattleDetails/UseScrollButton")
 end_turn_button = NodePath("BattlePanel/BattleButtonRow/EndTurnButton")
 restart_battle_button = NodePath("BattlePanel/BattleButtonRow/RestartBattleButton")
 
@@ -386,6 +390,36 @@ theme_override_colors/font_color = Color(0.85, 0.88, 0.92, 1)
 theme_override_font_sizes/font_size = 13
 text = "当前没有敌人意图。"
 autowrap_mode = 2
+
+[node name="RunItemDivider" type="HSeparator" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
+layout_mode = 2
+
+[node name="RunItemTitleLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 16
+text = "遗物与卷轴"
+
+[node name="RelicLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.76, 0.83, 0.9, 1)
+text = "遗物：无"
+autowrap_mode = 2
+
+[node name="ScrollSelector" type="OptionButton" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+
+[node name="ScrollDetailLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.79, 0.87, 1)
+text = "卷轴：无"
+
+[node name="UseScrollButton" type="Button" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+disabled = true
+text = "使用卷轴"
 
 [node name="BattleButtonRow" type="HBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel"]
 layout_mode = 2

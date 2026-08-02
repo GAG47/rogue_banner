@@ -16,6 +16,8 @@ func _init() -> void:
 	RunFlowSystemTest.run(suite)
 	MapSystemTest.run(suite)
 	MapFlowSystemTest.run(suite)
+	RunSessionControllerTest.run(suite)
+	RunScreenSceneTest.run(suite)
 	RunDebugSceneTest.run(suite)
 
 	if suite.passed():

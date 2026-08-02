@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="RewardPoolDefinition" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/rewards/reward_pool_definition.gd" id="1_pool"]
+[ext_resource type="Script" path="res://scripts/rewards/reward_entry_definition.gd" id="2_entry"]
+[ext_resource type="Script" path="res://scripts/rewards/currency_reward_definition.gd" id="3_gold"]
+
+[sub_resource type="Resource" id="Payload_gold"]
+script = ExtResource("3_gold")
+amount = 15
+
+[sub_resource type="Resource" id="Entry_gold"]
+script = ExtResource("2_entry")
+payload = SubResource("Payload_gold")
+weight = 1.0
+allow_duplicate = true
+
+[resource]
+script = ExtResource("1_pool")
+content_id = &"v8_chest_reward_pool"
+display_name = "补给箱"
+offer_rule = 1
+option_count = 1
+entries = [SubResource("Entry_gold")]

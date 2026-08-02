@@ -150,7 +150,7 @@ Types outside the v1 through v6 implemented sets remain planned contracts.
 | `RunPhase` | Ready, preparing or running Battle, resolving Map node, choosing Reward, shopping, or ended |
 | `RunEndReason` | None, victory, defeat, or abandonment |
 | `RewardKind` | Currency, Art, Relic, Scroll, Unit, healing, or Art upgrade |
-| `RewardOfferRule` | Pick one, take all, or purchase any |
+| `RewardOfferRule` | Pick one, pick any, take all, or purchase any |
 | `RewardSource` | Battle, shop, recruitment, chest, or event origin |
 | `MapNodeKind` | Start, Battle, elite, Boss, shop, camp, chest, or Event |
 | `ActionFailureCode` | Stable machine-readable action rejection categories |

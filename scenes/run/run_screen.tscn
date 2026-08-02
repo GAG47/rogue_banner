@@ -1,0 +1,584 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/run/run_screen_controller.gd" id="1_controller"]
+[ext_resource type="Script" path="res://scripts/ui/run/run_header_view.gd" id="2_header"]
+[ext_resource type="Script" path="res://scripts/ui/run/map_panel_view.gd" id="3_map"]
+[ext_resource type="Script" path="res://scripts/ui/run/deployment_panel_view.gd" id="4_deployment"]
+[ext_resource type="PackedScene" path="res://scenes/battle/battle_screen.tscn" id="5_battle"]
+[ext_resource type="Script" path="res://scripts/ui/run/reward_panel_view.gd" id="6_reward"]
+[ext_resource type="Script" path="res://scripts/ui/run/event_panel_view.gd" id="7_event"]
+[ext_resource type="Script" path="res://scripts/ui/run/run_result_view.gd" id="8_result"]
+[ext_resource type="Script" path="res://scripts/ui/run/inventory_overlay_view.gd" id="9_inventory"]
+[ext_resource type="Resource" path="res://content/heroes/v8_banner_captain.tres" id="10_hero"]
+[ext_resource type="Resource" path="res://content/maps/v8_first_route.tres" id="11_map"]
+[ext_resource type="Resource" path="res://content/scrolls/debug_blast_scroll.tres" id="12_scroll"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+bg_color = Color(0.065, 0.09, 0.125, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2, 0.34, 0.43, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="Style_feedback"]
+bg_color = Color(0.04, 0.06, 0.085, 0.98)
+border_width_top = 1
+border_color = Color(0.23, 0.76, 0.7, 0.7)
+
+[sub_resource type="StyleBoxFlat" id="Style_overlay"]
+bg_color = Color(0.075, 0.105, 0.145, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.84, 0.75, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="RunScreen" type="Control" node_paths=PackedStringArray("shell_header", "shell_content", "shell_footer", "header_view", "map_panel", "deployment_panel", "battle_host", "battle_screen", "reward_panel", "event_panel", "result_panel", "inventory_overlay", "feedback_label")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_controller")
+shell_header = NodePath("Header")
+shell_content = NodePath("Content")
+shell_footer = NodePath("Footer")
+header_view = NodePath("Header/HeaderMargin/HeaderRow")
+map_panel = NodePath("Content/ContentMargin/MapPanel")
+deployment_panel = NodePath("Content/ContentMargin/DeploymentPanel")
+battle_host = NodePath("Content/BattleHost")
+battle_screen = NodePath("Content/BattleHost/BattleScreen")
+reward_panel = NodePath("Content/ContentMargin/RewardPanel")
+event_panel = NodePath("Content/ContentMargin/EventPanel")
+result_panel = NodePath("Content/ContentMargin/RunResultPanel")
+inventory_overlay = NodePath("InventoryOverlay")
+feedback_label = NodePath("Footer/FeedbackLabel")
+hero_definition = ExtResource("10_hero")
+map_definition = ExtResource("11_map")
+starting_scrolls = Array[ExtResource("12_scroll")]([ExtResource("12_scroll")])
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.024, 0.034, 0.047, 1)
+
+[node name="Header" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 82.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("Style_feedback")
+
+[node name="HeaderMargin" type="MarginContainer" parent="Header"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 14
+
+[node name="HeaderRow" type="HBoxContainer" parent="Header/HeaderMargin" node_paths=PackedStringArray("run_title_label", "phase_label", "gold_label", "team_label", "relic_label", "scroll_label", "inventory_button", "abandon_button")]
+layout_mode = 2
+theme_override_constants/separation = 18
+script = ExtResource("2_header")
+run_title_label = NodePath("RunTitleLabel")
+phase_label = NodePath("PhaseLabel")
+gold_label = NodePath("GoldLabel")
+team_label = NodePath("TeamLabel")
+relic_label = NodePath("RelicLabel")
+scroll_label = NodePath("ScrollLabel")
+inventory_button = NodePath("InventoryButton")
+abandon_button = NodePath("AbandonButton")
+
+[node name="RunTitleLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.9, 0.95, 0.98, 1)
+theme_override_font_sizes/font_size = 24
+text = "远征"
+
+[node name="PhaseLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+text = "路线地图"
+vertical_alignment = 1
+
+[node name="GoldLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+layout_mode = 2
+text = "金币 0"
+vertical_alignment = 1
+
+[node name="TeamLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+layout_mode = 2
+text = "队伍 0/0"
+vertical_alignment = 1
+
+[node name="RelicLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+layout_mode = 2
+text = "遗物 0"
+vertical_alignment = 1
+
+[node name="ScrollLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+layout_mode = 2
+text = "卷轴 0/0"
+vertical_alignment = 1
+
+[node name="InventoryButton" type="Button" parent="Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(92, 42)
+layout_mode = 2
+text = "队伍构筑"
+
+[node name="AbandonButton" type="Button" parent="Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(84, 42)
+layout_mode = 2
+text = "放弃远征"
+
+[node name="Content" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 82.0
+offset_bottom = -62.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ContentMargin" type="MarginContainer" parent="Content"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 24
+
+[node name="MapPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("node_list", "node_detail_label")]
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("3_map")
+node_list = NodePath("MapMargin/MapRow/RouteScroll/NodeList")
+node_detail_label = NodePath("MapMargin/MapRow/MapInfo/NodeDetailLabel")
+
+[node name="MapMargin" type="MarginContainer" parent="Content/ContentMargin/MapPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="MapRow" type="HBoxContainer" parent="Content/ContentMargin/MapPanel/MapMargin"]
+layout_mode = 2
+theme_override_constants/separation = 30
+
+[node name="RouteScroll" type="ScrollContainer" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow"]
+custom_minimum_size = Vector2(540, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="NodeList" type="VBoxContainer" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow/RouteScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="MapInfo" type="VBoxContainer" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow"]
+custom_minimum_size = Vector2(360, 0)
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="MapTitleLabel" type="Label" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow/MapInfo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 26
+text = "远征路线"
+
+[node name="NodeDetailLabel" type="Label" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow/MapInfo"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.81, 0.89, 1)
+text = "选择一个节点继续。"
+autowrap_mode = 2
+
+[node name="DeploymentPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("encounter_label", "unit_selector", "deployment_grid", "deployed_unit_list", "start_battle_button", "reset_button")]
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("4_deployment")
+encounter_label = NodePath("DeploymentMargin/DeploymentContent/EncounterLabel")
+unit_selector = NodePath("DeploymentMargin/DeploymentContent/UnitSelector")
+deployment_grid = NodePath("DeploymentMargin/DeploymentContent/DeploymentGrid")
+deployed_unit_list = NodePath("DeploymentMargin/DeploymentContent/DeployedUnitList")
+start_battle_button = NodePath("DeploymentMargin/DeploymentContent/ButtonRow/StartBattleButton")
+reset_button = NodePath("DeploymentMargin/DeploymentContent/ButtonRow/ResetButton")
+
+[node name="DeploymentMargin" type="MarginContainer" parent="Content/ContentMargin/DeploymentPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="DeploymentContent" type="VBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="EncounterLabel" type="Label" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 24
+text = "战前部署"
+
+[node name="UnitSelector" type="OptionButton" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+
+[node name="DeploymentGrid" type="GridContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 5
+columns = 7
+
+[node name="DeployedUnitList" type="VBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+layout_mode = 2
+
+[node name="ButtonRow" type="HBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="StartBattleButton" type="Button" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "开始战斗"
+
+[node name="ResetButton" type="Button" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow"]
+custom_minimum_size = Vector2(130, 46)
+layout_mode = 2
+text = "清空部署"
+
+[node name="BattleHost" type="Control" parent="Content"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BattleScreen" parent="Content/BattleHost" instance=ExtResource("5_battle")]
+layout_mode = 1
+
+[node name="RewardPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("title_label", "option_list", "target_unit_selector", "target_art_selector", "scroll_selector", "discard_scroll_button", "finish_button", "take_all_button", "close_shop_button")]
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("6_reward")
+title_label = NodePath("RewardMargin/RewardContent/TitleLabel")
+option_list = NodePath("RewardMargin/RewardContent/OptionScroll/OptionList")
+target_unit_selector = NodePath("RewardMargin/RewardContent/TargetRow/TargetUnitSelector")
+target_art_selector = NodePath("RewardMargin/RewardContent/TargetRow/TargetArtSelector")
+scroll_selector = NodePath("RewardMargin/RewardContent/ScrollRow/ScrollSelector")
+discard_scroll_button = NodePath("RewardMargin/RewardContent/ScrollRow/DiscardScrollButton")
+finish_button = NodePath("RewardMargin/RewardContent/ButtonRow/FinishButton")
+take_all_button = NodePath("RewardMargin/RewardContent/ButtonRow/TakeAllButton")
+close_shop_button = NodePath("RewardMargin/RewardContent/ButtonRow/CloseShopButton")
+
+[node name="RewardMargin" type="MarginContainer" parent="Content/ContentMargin/RewardPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 26
+
+[node name="RewardContent" type="VBoxContainer" parent="Content/ContentMargin/RewardPanel/RewardMargin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TitleLabel" type="Label" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 26
+text = "节点奖励"
+
+[node name="HintLabel" type="Label" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent"]
+layout_mode = 2
+text = "治疗和升级奖励使用下方目标；卷轴背包满时可以先丢弃一张。"
+
+[node name="TargetRow" type="HBoxContainer" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent"]
+layout_mode = 2
+
+[node name="TargetUnitSelector" type="OptionButton" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/TargetRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TargetArtSelector" type="OptionButton" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/TargetRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="OptionScroll" type="ScrollContainer" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="OptionList" type="VBoxContainer" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/OptionScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="ScrollRow" type="HBoxContainer" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent"]
+layout_mode = 2
+
+[node name="ScrollSelector" type="OptionButton" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/ScrollRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DiscardScrollButton" type="Button" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/ScrollRow"]
+layout_mode = 2
+text = "丢弃一张卷轴"
+
+[node name="ButtonRow" type="HBoxContainer" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent"]
+layout_mode = 2
+
+[node name="FinishButton" type="Button" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/ButtonRow"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "完成奖励选择"
+
+[node name="TakeAllButton" type="Button" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/ButtonRow"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "领取全部"
+
+[node name="CloseShopButton" type="Button" parent="Content/ContentMargin/RewardPanel/RewardMargin/RewardContent/ButtonRow"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "离开商店"
+
+[node name="EventPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("title_label", "detail_label", "choice_list", "target_unit_selector", "execute_button")]
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("7_event")
+title_label = NodePath("EventMargin/EventContent/TitleLabel")
+detail_label = NodePath("EventMargin/EventContent/DetailLabel")
+choice_list = NodePath("EventMargin/EventContent/ChoiceList")
+target_unit_selector = NodePath("EventMargin/EventContent/TargetUnitSelector")
+execute_button = NodePath("EventMargin/EventContent/ExecuteButton")
+
+[node name="EventMargin" type="MarginContainer" parent="Content/ContentMargin/EventPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 36
+theme_override_constants/margin_top = 32
+theme_override_constants/margin_right = 36
+theme_override_constants/margin_bottom = 32
+
+[node name="EventContent" type="VBoxContainer" parent="Content/ContentMargin/EventPanel/EventMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="TitleLabel" type="Label" parent="Content/ContentMargin/EventPanel/EventMargin/EventContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 28
+text = "路线事件"
+
+[node name="DetailLabel" type="Label" parent="Content/ContentMargin/EventPanel/EventMargin/EventContent"]
+layout_mode = 2
+text = "选择一个结果。"
+autowrap_mode = 2
+
+[node name="ChoiceList" type="VBoxContainer" parent="Content/ContentMargin/EventPanel/EventMargin/EventContent"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="TargetUnitSelector" type="OptionButton" parent="Content/ContentMargin/EventPanel/EventMargin/EventContent"]
+layout_mode = 2
+
+[node name="ExecuteButton" type="Button" parent="Content/ContentMargin/EventPanel/EventMargin/EventContent"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "执行确定的结果"
+
+[node name="RunResultPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("title_label", "detail_label", "new_run_button")]
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_panel")
+script = ExtResource("8_result")
+title_label = NodePath("ResultCenter/ResultContent/TitleLabel")
+detail_label = NodePath("ResultCenter/ResultContent/DetailLabel")
+new_run_button = NodePath("ResultCenter/ResultContent/NewRunButton")
+
+[node name="ResultCenter" type="CenterContainer" parent="Content/ContentMargin/RunResultPanel"]
+layout_mode = 2
+
+[node name="ResultContent" type="VBoxContainer" parent="Content/ContentMargin/RunResultPanel/ResultCenter"]
+custom_minimum_size = Vector2(560, 300)
+layout_mode = 2
+theme_override_constants/separation = 26
+
+[node name="TitleLabel" type="Label" parent="Content/ContentMargin/RunResultPanel/ResultCenter/ResultContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 34
+text = "远征结束"
+horizontal_alignment = 1
+
+[node name="DetailLabel" type="Label" parent="Content/ContentMargin/RunResultPanel/ResultCenter/ResultContent"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "本局已经结束。"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="NewRunButton" type="Button" parent="Content/ContentMargin/RunResultPanel/ResultCenter/ResultContent"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "开始新远征"
+
+[node name="Footer" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -62.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("Style_feedback")
+
+[node name="FeedbackLabel" type="Label" parent="Footer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.76, 0.93, 0.9, 1)
+text = "正在准备远征……"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="InventoryOverlay" type="ColorRect" parent="." node_paths=PackedStringArray("summary_label", "relic_label", "unit_selector", "art_selector", "slot_selector", "scroll_selector", "install_button", "uninstall_button", "upgrade_button", "forget_button", "discard_scroll_button", "close_button")]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.01, 0.015, 0.022, 0.84)
+script = ExtResource("9_inventory")
+summary_label = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/SummaryLabel")
+relic_label = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/RelicLabel")
+unit_selector = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/UnitSelector")
+art_selector = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtSelector")
+slot_selector = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/SlotSelector")
+scroll_selector = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ScrollSelector")
+install_button = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow/InstallButton")
+uninstall_button = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow/UninstallButton")
+upgrade_button = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow/UpgradeButton")
+forget_button = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow/ForgetButton")
+discard_scroll_button = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ScrollRow/DiscardScrollButton")
+close_button = NodePath("OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/CloseButton")
+
+[node name="OverlayCenter" type="CenterContainer" parent="InventoryOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="OverlayPanel" type="PanelContainer" parent="InventoryOverlay/OverlayCenter"]
+custom_minimum_size = Vector2(700, 520)
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_overlay")
+
+[node name="OverlayMargin" type="MarginContainer" parent="InventoryOverlay/OverlayCenter/OverlayPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 30
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 30
+theme_override_constants/margin_bottom = 26
+
+[node name="OverlayContent" type="VBoxContainer" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 25
+text = "队伍与构筑"
+
+[node name="SummaryLabel" type="Label" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+text = "队伍信息"
+
+[node name="RelicLabel" type="Label" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+text = "遗物：无"
+autowrap_mode = 2
+
+[node name="UnitSelector" type="OptionButton" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+
+[node name="ArtSelector" type="OptionButton" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+
+[node name="SlotSelector" type="OptionButton" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+
+[node name="ArtButtonRow" type="HBoxContainer" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+
+[node name="InstallButton" type="Button" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "安装"
+
+[node name="UninstallButton" type="Button" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "拆卸"
+
+[node name="UpgradeButton" type="Button" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "升级"
+
+[node name="ForgetButton" type="Button" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ArtButtonRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "遗忘"
+
+[node name="ScrollRow" type="HBoxContainer" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+layout_mode = 2
+
+[node name="ScrollSelector" type="OptionButton" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ScrollRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DiscardScrollButton" type="Button" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent/ScrollRow"]
+layout_mode = 2
+text = "丢弃一张卷轴"
+
+[node name="CloseButton" type="Button" parent="InventoryOverlay/OverlayCenter/OverlayPanel/OverlayMargin/OverlayContent"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+text = "关闭"

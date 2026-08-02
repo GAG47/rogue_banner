@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="EncounterDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/encounter_definition.gd" id="1_encounter"]
+[ext_resource type="Script" path="res://scripts/map/enemy_spawn_definition.gd" id="2_spawn"]
+[ext_resource type="Resource" path="res://content/encounters/v7_battlefield.tres" id="3_battlefield"]
+[ext_resource type="Resource" path="res://content/enemies/debug_archer.tres" id="4_archer"]
+[ext_resource type="Resource" path="res://content/rewards/v8_battle_reward_pool.tres" id="5_reward"]
+
+[sub_resource type="Resource" id="Spawn_archer"]
+script = ExtResource("2_spawn")
+enemy_definition = ExtResource("4_archer")
+coordinate = Vector2i(5, 2)
+
+[resource]
+script = ExtResource("1_encounter")
+content_id = &"v8_standard_encounter"
+display_name = "前线斥候"
+battlefield = ExtResource("3_battlefield")
+enemy_spawns = [SubResource("Spawn_archer")]
+battle_rank = 0
+reward_pool = ExtResource("5_reward")

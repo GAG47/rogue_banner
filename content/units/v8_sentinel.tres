@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="UnitDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/unit_definition.gd" id="1_unit"]
+[ext_resource type="Resource" path="res://content/arts/debug_run_strike.tres" id="2_strike"]
+[ext_resource type="Resource" path="res://content/arts/debug_guard.tres" id="3_guard"]
+
+[resource]
+script = ExtResource("1_unit")
+content_id = &"v8_sentinel"
+display_name = "战旗守卫"
+max_health = 18
+base_attack = 4
+max_ap = 6
+slot_count = 4
+default_arts = [ExtResource("2_strike"), ExtResource("3_guard")]

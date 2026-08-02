@@ -64,7 +64,10 @@ func start_battle_in_transaction(
 				request.reward_pool
 		).is_valid()
 		or request.reward_pool.offer_rule
-		!= GameEnums.RewardOfferRule.PICK_ONE
+		not in [
+			GameEnums.RewardOfferRule.PICK_ONE,
+			GameEnums.RewardOfferRule.PICK_ANY,
+		]
 	):
 		return RunFlowResult.failure(GameEnums.RunCommandCode.INVALID_TARGET)
 	var required_phase: GameEnums.RunPhase = GameEnums.RunPhase.READY

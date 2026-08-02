@@ -27,6 +27,7 @@ res://
 │   ├── heroes/
 │   ├── intents/
 │   ├── map_events/
+│   ├── maps/
 │   ├── relics/
 │   ├── rewards/
 │   ├── scrolls/
@@ -37,6 +38,7 @@ res://
 ├── scenes/
 │   ├── battle/
 │   ├── debug/
+│   ├── run/
 │   └── ui/
 ├── scripts/
 │   ├── arts/
@@ -127,6 +129,8 @@ cycle with a global manager.
 | Current Map activity and downstream provenance | Map node session | Map flow, Battle session, and Reward offer validation |
 | Sampled Event choice and outcome | Map Event session | Event execution and Map read model |
 | Formal Battle presentation snapshot | Detached Battle read model | Battle scene views |
+| Active Run and current Battle object | Per-run session controller | Run screens and composed Battle screen |
+| Formal Run presentation snapshot | Split detached Run read models | Map, deployment, reward, event, and inventory views |
 | Available authored content | Content catalog | Run setup, rewards, and persistence |
 
 Only an owning system may mutate its state. Other systems issue typed requests
@@ -164,6 +168,13 @@ controller may own the authoritative Battle lifecycle and submit typed requests,
 but it does not expose mutable `BattleState` or `UnitState` references to child
 views. Presentation selection, hover, and pending-target mode are UI state and
 never duplicate a gameplay fact.
+
+The formal Run screen owns one `RunSessionController`. The controller retains
+the authoritative `RunState`, the current `BattleState`, and the Map flow
+service for that Run only. Its visible route is derived from `RunPhase` and the
+active Map node session. Views receive detached summary, Map, deployment,
+reward, event, inventory, and Battle models. They never retain mutable Run
+objects or duplicate the gameplay phase.
 
 Fixed nodes are created manually in the Godot editor. Runtime code may create
 truly dynamic entities such as units, indicators, projectiles, and effects from

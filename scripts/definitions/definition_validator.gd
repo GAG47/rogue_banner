@@ -992,13 +992,15 @@ func _validate_encounter(
 				&"reward_pool"
 		)
 		if (
-			definition.reward_pool.offer_rule
-			!= GameEnums.RewardOfferRule.PICK_ONE
+			definition.reward_pool.offer_rule not in [
+				GameEnums.RewardOfferRule.PICK_ONE,
+				GameEnums.RewardOfferRule.PICK_ANY,
+			]
 		):
 			result.add_issue(
 					GameEnums.DefinitionValidationCode.INVALID_ENCOUNTER,
 					&"reward_pool",
-					"Encounter rewards must use the pick-one rule."
+					"Encounter rewards must use pick-one or pick-any."
 			)
 
 

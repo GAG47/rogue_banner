@@ -20,6 +20,7 @@ func build(source: BattleState) -> BattleReadModel:
 	_build_cells(battle, model)
 	_build_units(battle, model)
 	_build_intents(battle, model)
+	_build_run_items(battle, model)
 	return model
 
 
@@ -143,3 +144,25 @@ func _build_intents(battle: BattleState, model: BattleReadModel) -> void:
 		intent.affected_cells.assign(source.affected_cells)
 		intent.currently_valid = source.currently_valid
 		model.intents.append(intent)
+
+
+func _build_run_items(battle: BattleState, model: BattleReadModel) -> void:
+	for source_relic: BattleRelicState in battle.get_relics():
+		if source_relic == null or source_relic.definition == null:
+			continue
+		var relic: BattleRelicReadModel = BattleRelicReadModel.new()
+		relic.instance_id = source_relic.instance_id
+		relic.display_name = source_relic.definition.display_name
+		model.relics.append(relic)
+	for source_scroll: BattleScrollStackState in battle.get_scrolls():
+		if source_scroll == null or source_scroll.definition == null:
+			continue
+		var scroll: BattleScrollReadModel = BattleScrollReadModel.new()
+		scroll.stack_instance_id = source_scroll.instance_id
+		scroll.display_name = source_scroll.definition.display_name
+		scroll.quantity = source_scroll.quantity
+		if source_scroll.definition.targeting != null:
+			scroll.target_kind = source_scroll.definition.targeting.target_kind
+			scroll.minimum_range = source_scroll.definition.targeting.minimum_range
+			scroll.maximum_range = source_scroll.definition.targeting.maximum_range
+		model.scrolls.append(scroll)

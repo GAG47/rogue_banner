@@ -9,6 +9,8 @@ var grid_height: int = 0
 var cells: Dictionary[Vector2i, BattleCellReadModel] = {}
 var units: Array[BattleUnitReadModel] = []
 var intents: Array[BattleIntentReadModel] = []
+var relics: Array[BattleRelicReadModel] = []
+var scrolls: Array[BattleScrollReadModel] = []
 
 
 func get_cell(coordinate: Vector2i) -> BattleCellReadModel:

@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="CampDefinition" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/camp_definition.gd" id="1_camp"]
+[ext_resource type="Script" path="res://scripts/map/map_event_choice_definition.gd" id="2_choice"]
+[ext_resource type="Script" path="res://scripts/map/map_event_outcome_definition.gd" id="3_outcome"]
+[ext_resource type="Script" path="res://scripts/map/heal_unit_map_operation_definition.gd" id="4_heal"]
+
+[sub_resource type="Resource" id="Operation_heal"]
+script = ExtResource("4_heal")
+amount = 6
+
+[sub_resource type="Resource" id="Outcome_heal"]
+script = ExtResource("3_outcome")
+outcome_id = &"rest_result"
+operations = [SubResource("Operation_heal")]
+
+[sub_resource type="Resource" id="Choice_heal"]
+script = ExtResource("2_choice")
+choice_id = &"rest"
+display_name = "休整：为一名单位恢复6点生命"
+outcomes = [SubResource("Outcome_heal")]
+
+[resource]
+script = ExtResource("1_camp")
+content_id = &"v8_camp"
+display_name = "行军营地"
+choices = [SubResource("Choice_heal")]

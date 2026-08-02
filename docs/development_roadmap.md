@@ -229,6 +229,31 @@ The v7 gate is:
 Map and Run presentation remain deferred; this is not an implementation of the
 full Phase 12 production interface.
 
+## Interim v8 Complete Run Milestone
+
+Implemented in v8. Final UI composition and request boundaries are recorded in
+`docs/run_ui.md`.
+
+v8 connects the existing Map, Encounter, Battle, Reward, Shop, Event, Camp,
+Chest, and Run systems into the first complete in-run route. It is a functional
+playability milestone, not meta progression or final production presentation.
+
+The v8 gate is:
+
+- One per-run session controller owns Run and current Battle lifecycles.
+- UI routing is derived from authoritative Run phase and Map session facts.
+- Battle results are written back only after the player continues from the
+  terminal Battle screen.
+- `PICK_ANY` rewards support independent claim and skip state plus explicit
+  completion.
+- A fixed authored route can be played from its first node through the Boss and
+  ends with an explicit victory, defeat, or abandonment result.
+- Map, deployment, Battle, reward, shop, event, camp, chest, inventory, and
+  result screens submit typed requests and consume detached read models.
+
+Save data, hero selection, unlocks, meta progression, final art, tutorial, and
+production presentation remain deferred.
+
 ## Phase 9: Heroes and Meta Progression
 
 Complete:

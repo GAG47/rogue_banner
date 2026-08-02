@@ -3,6 +3,7 @@ extends Control
 
 signal battle_read_model_changed(model: BattleReadModel)
 signal feedback_changed(message: String)
+signal external_battle_continue_requested
 
 const BATTLE_SEED: int = 20260802
 
@@ -43,6 +44,8 @@ var _selected_unit_id: int = 0
 var _inspected_unit_id: int = 0
 var _selected_art_slot_index: int = -1
 var _pending_art_slot_index: int = -1
+var _selected_scroll_stack_id: int = 0
+var _pending_scroll_stack_id: int = 0
 var _hovered_coordinate: GridCoordinate
 var _deployed_count: int = 0
 var _deployment_cells: Dictionary[Vector2i, bool] = {}
@@ -50,6 +53,7 @@ var _reachable_cells: Dictionary[Vector2i, int] = {}
 var _art_range_cells: Dictionary[Vector2i, bool] = {}
 var _targetable_cells: Dictionary[Vector2i, bool] = {}
 var _art_affected_cells: Dictionary[Vector2i, bool] = {}
+var _external_battle_mode: bool = false
 
 
 func _init() -> void:
@@ -62,7 +66,32 @@ func _init() -> void:
 
 func _ready() -> void:
 	_connect_interface()
-	rebuild_battle()
+	if not _external_battle_mode:
+		rebuild_battle()
+
+
+func present_external_battle(battle: BattleState) -> bool:
+	if battle == null or battle.grid == null:
+		return false
+	_external_battle_mode = true
+	_battle = battle
+	_deployed_count = battle.get_units_for_side(
+		GameEnums.BattleSide.PLAYER
+	).size()
+	_deployment_cells.clear()
+	_reset_interaction_state()
+	status_view.set_restart_available(false)
+	_set_feedback("战斗已载入。阅读敌人意图后提交行动。")
+	_refresh_view()
+	return true
+
+
+func clear_external_battle() -> void:
+	_external_battle_mode = false
+	_battle = null
+	_reset_interaction_state()
+	status_view.set_restart_available(true)
+	_refresh_view()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -145,6 +174,9 @@ func request_cell_action(coordinate: Vector2i) -> void:
 		return
 	if _pending_art_slot_index >= 0:
 		_execute_pending_art(coordinate)
+		return
+	if _pending_scroll_stack_id > 0:
+		_execute_pending_scroll(coordinate)
 		return
 	var occupant: GridOccupant = _battle.grid.get_occupant(coordinate)
 	if occupant != null and occupant.kind == GameEnums.GridOccupantKind.UNIT:
@@ -253,6 +285,7 @@ func request_select_unit(unit_id: int) -> bool:
 	_inspected_unit_id = unit_id
 	_selected_art_slot_index = _first_active_art_slot(unit)
 	_pending_art_slot_index = -1
+	_pending_scroll_stack_id = 0
 	_art_range_cells.clear()
 	_targetable_cells.clear()
 	_art_affected_cells.clear()
@@ -277,6 +310,7 @@ func request_inspect_unit(unit_id: int) -> bool:
 	_selected_unit_id = 0
 	_selected_art_slot_index = _first_active_art_slot(unit)
 	_pending_art_slot_index = -1
+	_pending_scroll_stack_id = 0
 	_reachable_cells.clear()
 	_art_range_cells.clear()
 	_targetable_cells.clear()
@@ -291,6 +325,7 @@ func request_inspect_unit(unit_id: int) -> bool:
 func request_select_art(slot_index: int) -> void:
 	_selected_art_slot_index = slot_index
 	_pending_art_slot_index = -1
+	_pending_scroll_stack_id = 0
 	_art_range_cells.clear()
 	_targetable_cells.clear()
 	_art_affected_cells.clear()
@@ -347,6 +382,60 @@ func request_toggle_art_targeting() -> bool:
 	return true
 
 
+func request_select_scroll(stack_instance_id: int) -> void:
+	_selected_scroll_stack_id = stack_instance_id
+	_pending_scroll_stack_id = 0
+	_pending_art_slot_index = -1
+	_art_range_cells.clear()
+	_targetable_cells.clear()
+	_art_affected_cells.clear()
+	_refresh_reachable_cells()
+	_refresh_view()
+
+
+func request_toggle_scroll_targeting() -> bool:
+	if _pending_scroll_stack_id > 0:
+		_pending_scroll_stack_id = 0
+		_art_range_cells.clear()
+		_targetable_cells.clear()
+		_art_affected_cells.clear()
+		_refresh_reachable_cells()
+		_set_feedback("已取消卷轴目标选择。")
+		_refresh_view()
+		return true
+	if _battle == null or _selected_unit_id <= 0 or _selected_scroll_stack_id <= 0:
+		_set_feedback("请先选择我方单位和一张卷轴。")
+		return false
+	var stack: BattleScrollStackState = _battle.get_scroll(
+		_selected_scroll_stack_id
+	)
+	if stack == null or stack.quantity <= 0 or stack.definition.targeting == null:
+		_set_feedback("该卷轴当前不可用。")
+		return false
+	_pending_art_slot_index = -1
+	_pending_scroll_stack_id = _selected_scroll_stack_id
+	_reachable_cells.clear()
+	_art_range_cells = _targeting_service.find_scroll_range_cells(
+		_battle,
+		_selected_unit_id,
+		_pending_scroll_stack_id
+	)
+	_targetable_cells = _targeting_service.find_scroll_targetable_cells(
+		_battle,
+		_action_service,
+		_selected_unit_id,
+		_pending_scroll_stack_id
+	)
+	if stack.definition.targeting.target_kind == GameEnums.TargetKind.BATTLE:
+		var selection: TargetSelection = TargetSelection.new()
+		selection.targets_battle = true
+		_execute_scroll(selection)
+		return true
+	_set_feedback("已显示卷轴射程和合法落点。")
+	_refresh_view()
+	return true
+
+
 func request_end_turn() -> bool:
 	if (
 		_battle == null
@@ -371,6 +460,9 @@ func request_end_turn() -> bool:
 
 
 func request_restart_battle() -> bool:
+	if _external_battle_mode:
+		_set_feedback("整局战斗不能重新开始。")
+		return false
 	return rebuild_battle()
 
 
@@ -447,6 +539,44 @@ func _execute_art(selection: TargetSelection) -> void:
 	_refresh_view()
 
 
+func _execute_pending_scroll(coordinate: Vector2i) -> void:
+	if not _targetable_cells.has(coordinate):
+		_set_feedback("该格子不是当前卷轴的合法落点。")
+		return
+	var selection: TargetSelection = (
+		_targeting_service.scroll_selection_for_coordinate(
+			_battle,
+			_pending_scroll_stack_id,
+			coordinate
+		)
+	)
+	if selection == null:
+		_set_feedback("无法从该格子建立卷轴目标。")
+		return
+	_execute_scroll(selection)
+
+
+func _execute_scroll(selection: TargetSelection) -> void:
+	var request: UseScrollActionRequest = UseScrollActionRequest.create(
+		_selected_unit_id,
+		_pending_scroll_stack_id,
+		selection
+	)
+	var result: ActionExecutionResult = _action_service.execute(_battle, request)
+	_pending_scroll_stack_id = 0
+	_art_range_cells.clear()
+	_targetable_cells.clear()
+	_art_affected_cells.clear()
+	if result.is_successful:
+		_set_feedback(BattleUiTextFormatter.action_result_text(result))
+	else:
+		_set_feedback("无法使用卷轴：%s。" % (
+			BattleUiTextFormatter.failure_code_text(result.failure_code)
+		))
+	_refresh_reachable_cells()
+	_refresh_view()
+
+
 func _refresh_reachable_cells() -> void:
 	_reachable_cells.clear()
 	if (
@@ -454,6 +584,7 @@ func _refresh_reachable_cells() -> void:
 		or _battle.phase != GameEnums.BattlePhase.PLAYER_TURN
 		or _selected_unit_id <= 0
 		or _pending_art_slot_index >= 0
+		or _pending_scroll_stack_id > 0
 	):
 		return
 	for y: int in range(_battle.grid.height):
@@ -502,20 +633,37 @@ func _refresh_art_affected_cells() -> void:
 	if (
 		_battle == null
 		or _hovered_coordinate == null
-		or _pending_art_slot_index < 0
+		or (
+			_pending_art_slot_index < 0
+			and _pending_scroll_stack_id <= 0
+		)
 		or not _targetable_cells.has(_hovered_coordinate.value)
 	):
 		return
-	_art_affected_cells = _targeting_service.find_affected_cells(
-		_battle,
-		_selected_unit_id,
-		_pending_art_slot_index,
-		_hovered_coordinate.value
-	)
+	if _pending_scroll_stack_id > 0:
+		_art_affected_cells = _targeting_service.find_scroll_affected_cells(
+			_battle,
+			_selected_unit_id,
+			_pending_scroll_stack_id,
+			_hovered_coordinate.value
+		)
+	else:
+		_art_affected_cells = _targeting_service.find_affected_cells(
+			_battle,
+			_selected_unit_id,
+			_pending_art_slot_index,
+			_hovered_coordinate.value
+		)
 
 
 func _refresh_view() -> void:
 	_read_model = _read_model_service.build(_battle)
+	if (
+		_selected_scroll_stack_id <= 0
+		and _read_model != null
+		and not _read_model.scrolls.is_empty()
+	):
+		_selected_scroll_stack_id = _read_model.scrolls[0].stack_instance_id
 	if grid_view != null:
 		grid_view.present(_read_model)
 	if unit_view != null:
@@ -526,6 +674,8 @@ func _refresh_view() -> void:
 			_inspected_unit_id,
 			_selected_art_slot_index,
 			_pending_art_slot_index,
+			_selected_scroll_stack_id,
+			_pending_scroll_stack_id,
 			_deployed_count,
 			player_unit_definitions.size(),
 			_next_deployment_name()
@@ -603,10 +753,15 @@ func _refresh_result() -> void:
 	)
 	result_title_label.text = "战斗胜利" if victory else "战斗失败"
 	result_detail_label.text = (
-		"全部敌人已经被击败。你完成了 v7 的单场战斗闭环。"
+		"全部敌人已经被击败。继续后结算战斗并返回远征流程。"
 		if victory
-		else "我方单位全部倒下。可以重新部署并再次尝试。"
+		else "我方单位全部倒下。继续后结算本次远征。"
 	)
+	result_restart_button.text = (
+		"继续" if _external_battle_mode else "重新挑战"
+	)
+	if status_view != null:
+		status_view.set_restart_available(not _external_battle_mode)
 
 
 func _connect_interface() -> void:
@@ -626,14 +781,31 @@ func _connect_interface() -> void:
 		request_toggle_art_targeting
 	):
 		status_view.art_use_requested.connect(request_toggle_art_targeting)
+	if not status_view.scroll_selected.is_connected(request_select_scroll):
+		status_view.scroll_selected.connect(request_select_scroll)
+	if not status_view.scroll_use_requested.is_connected(
+		request_toggle_scroll_targeting
+	):
+		status_view.scroll_use_requested.connect(
+			request_toggle_scroll_targeting
+		)
 	if not status_view.end_turn_requested.is_connected(request_end_turn):
 		status_view.end_turn_requested.connect(request_end_turn)
 	if not status_view.battle_restart_requested.is_connected(
 		request_restart_battle
 	):
 		status_view.battle_restart_requested.connect(request_restart_battle)
-	if not result_restart_button.pressed.is_connected(request_restart_battle):
-		result_restart_button.pressed.connect(request_restart_battle)
+	if not result_restart_button.pressed.is_connected(
+		_on_result_action_pressed
+	):
+		result_restart_button.pressed.connect(_on_result_action_pressed)
+
+
+func _on_result_action_pressed() -> void:
+	if _external_battle_mode:
+		external_battle_continue_requested.emit()
+		return
+	request_restart_battle()
 
 
 func _reset_interaction_state() -> void:
@@ -641,6 +813,8 @@ func _reset_interaction_state() -> void:
 	_inspected_unit_id = 0
 	_selected_art_slot_index = -1
 	_pending_art_slot_index = -1
+	_selected_scroll_stack_id = 0
+	_pending_scroll_stack_id = 0
 	_hovered_coordinate = null
 	_reachable_cells.clear()
 	_art_range_cells.clear()

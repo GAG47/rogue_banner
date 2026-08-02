@@ -155,3 +155,117 @@ func get_art_state(
 	):
 		return null
 	return unit.arts[art_slot_index]
+
+
+func find_scroll_range_cells(
+	battle: BattleState,
+	actor_unit_id: int,
+	stack_instance_id: int
+) -> Dictionary[Vector2i, bool]:
+	var result: Dictionary[Vector2i, bool] = {}
+	if battle == null:
+		return result
+	var stack: BattleScrollStackState = battle.get_scroll(stack_instance_id)
+	if stack == null or stack.definition == null or stack.definition.targeting == null:
+		return result
+	for coordinate: Vector2i in _target_resolver.find_range_cells(
+		stack.definition.targeting,
+		battle,
+		actor_unit_id
+	):
+		result[coordinate] = true
+	return result
+
+
+func find_scroll_targetable_cells(
+	battle: BattleState,
+	action_service: BattleActionService,
+	actor_unit_id: int,
+	stack_instance_id: int
+) -> Dictionary[Vector2i, bool]:
+	var result: Dictionary[Vector2i, bool] = {}
+	if battle == null or battle.grid == null or action_service == null:
+		return result
+	for y: int in range(battle.grid.height):
+		for x: int in range(battle.grid.width):
+			var coordinate: Vector2i = Vector2i(x, y)
+			var selection: TargetSelection = scroll_selection_for_coordinate(
+				battle,
+				stack_instance_id,
+				coordinate
+			)
+			if selection == null:
+				continue
+			var request: UseScrollActionRequest = UseScrollActionRequest.create(
+				actor_unit_id,
+				stack_instance_id,
+				selection
+			)
+			if action_service.validate(battle, request).is_valid:
+				result[coordinate] = true
+	return result
+
+
+func find_scroll_affected_cells(
+	battle: BattleState,
+	actor_unit_id: int,
+	stack_instance_id: int,
+	coordinate: Vector2i
+) -> Dictionary[Vector2i, bool]:
+	var result: Dictionary[Vector2i, bool] = {}
+	if battle == null:
+		return result
+	var stack: BattleScrollStackState = battle.get_scroll(stack_instance_id)
+	var selection: TargetSelection = scroll_selection_for_coordinate(
+		battle,
+		stack_instance_id,
+		coordinate
+	)
+	if (
+		stack == null
+		or stack.definition == null
+		or stack.definition.targeting == null
+		or selection == null
+	):
+		return result
+	var resolution: TargetResolutionResult = _target_resolver.resolve(
+		stack.definition.targeting,
+		BattleTargetingContext.create(battle, actor_unit_id, selection),
+		selection
+	)
+	if not resolution.is_valid:
+		return result
+	for affected: Vector2i in resolution.resolved_targets.affected_cells:
+		result[affected] = true
+	return result
+
+
+func scroll_selection_for_coordinate(
+	battle: BattleState,
+	stack_instance_id: int,
+	coordinate: Vector2i
+) -> TargetSelection:
+	if battle == null or battle.grid == null:
+		return null
+	var stack: BattleScrollStackState = battle.get_scroll(stack_instance_id)
+	if stack == null or stack.definition == null or stack.definition.targeting == null:
+		return null
+	var selection: TargetSelection = TargetSelection.new()
+	var occupant: GridOccupant = battle.grid.get_occupant(coordinate)
+	match stack.definition.targeting.target_kind:
+		GameEnums.TargetKind.UNIT:
+			if occupant == null or occupant.kind != GameEnums.GridOccupantKind.UNIT:
+				return null
+			selection.unit_instance_ids.append(occupant.runtime_id)
+		GameEnums.TargetKind.CELL:
+			selection.cells.append(coordinate)
+		GameEnums.TargetKind.TERRAIN_OBJECT:
+			if (
+				occupant == null
+				or occupant.kind != GameEnums.GridOccupantKind.SCENE_OBJECT
+			):
+				return null
+			selection.terrain_object_instance_ids.append(occupant.runtime_id)
+		GameEnums.TargetKind.BATTLE:
+			selection.targets_battle = true
+	return selection

@@ -309,6 +309,77 @@ func take_all_current_offer(
 	return _success_with_read_model(run)
 
 
+func skip_current_offer_option(
+	run: RunState,
+	offer_id: int,
+	option_id: int
+) -> MapFlowResult:
+	if run == null:
+		return MapFlowResult.failure(GameEnums.MapFlowCode.INVALID_RUN)
+	var transaction: RunTransaction = RunTransaction.begin(run)
+	if transaction == null or transaction.working_state == null:
+		return MapFlowResult.failure(GameEnums.MapFlowCode.INVALID_RUN)
+	var working: RunState = transaction.working_state
+	var validation: MapFlowResult = _validate_progression_offer(
+		working,
+		offer_id
+	)
+	if not validation.succeeded():
+		return validation
+	var skipped: RunCommandResult = (
+		_reward_offer_service.skip_option_in_transaction(
+			working,
+			offer_id,
+			option_id
+		)
+	)
+	if not skipped.succeeded():
+		return MapFlowResult.failure(
+			_map_run_failure(skipped.code, false)
+		)
+	if not transaction.commit():
+		return MapFlowResult.failure(GameEnums.MapFlowCode.STATE_CHANGED)
+	var result: MapFlowResult = _success_with_read_model(run)
+	result.offer = run.get_active_offer()
+	return result
+
+
+func finish_current_offer(
+	run: RunState,
+	offer_id: int
+) -> MapFlowResult:
+	if run == null:
+		return MapFlowResult.failure(GameEnums.MapFlowCode.INVALID_RUN)
+	var transaction: RunTransaction = RunTransaction.begin(run)
+	if transaction == null or transaction.working_state == null:
+		return MapFlowResult.failure(GameEnums.MapFlowCode.INVALID_RUN)
+	var working: RunState = transaction.working_state
+	var validation: MapFlowResult = _validate_progression_offer(
+		working,
+		offer_id
+	)
+	if not validation.succeeded():
+		return validation
+	var finished: RunCommandResult = (
+		_reward_offer_service.finish_offer_in_transaction(
+			working,
+			offer_id
+		)
+	)
+	if not finished.succeeded():
+		return MapFlowResult.failure(
+			_map_run_failure(finished.code, false)
+		)
+	var map_state: MapState = working._get_map_state_mutable()
+	var session: MapNodeSessionState = _active_session(map_state)
+	var node: MapNodeState = _session_node(map_state, session)
+	if not _complete_current_node(working, map_state, node):
+		return MapFlowResult.failure(GameEnums.MapFlowCode.INTERNAL_FAILURE)
+	if not transaction.commit():
+		return MapFlowResult.failure(GameEnums.MapFlowCode.STATE_CHANGED)
+	return _success_with_read_model(run)
+
+
 func close_current_shop(run: RunState, offer_id: int) -> MapFlowResult:
 	if run == null:
 		return MapFlowResult.failure(GameEnums.MapFlowCode.INVALID_RUN)

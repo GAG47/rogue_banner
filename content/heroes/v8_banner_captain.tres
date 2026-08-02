@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="HeroDefinition" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/definitions/hero_definition.gd" id="1_hero"]
+[ext_resource type="Resource" path="res://content/units/v8_vanguard.tres" id="2_vanguard"]
+[ext_resource type="Resource" path="res://content/units/v8_sentinel.tres" id="3_sentinel"]
+[ext_resource type="Resource" path="res://content/relics/debug_resolute_banner.tres" id="4_relic"]
+[ext_resource type="Resource" path="res://content/arts/debug_shove.tres" id="5_shove"]
+[ext_resource type="Resource" path="res://content/arts/debug_focus.tres" id="6_focus"]
+
+[resource]
+script = ExtResource("1_hero")
+content_id = &"v8_banner_captain"
+display_name = "战旗队长"
+starting_units = [ExtResource("2_vanguard"), ExtResource("3_sentinel")]
+starting_relics = [ExtResource("4_relic")]
+art_pool = [ExtResource("5_shove"), ExtResource("6_focus")]

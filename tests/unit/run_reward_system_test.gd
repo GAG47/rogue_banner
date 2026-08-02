@@ -19,6 +19,7 @@ static func run(suite: TestSuite) -> void:
 	_test_battle_reward_generation_allows_dynamic_underfill(suite)
 	_test_take_all_generation_rejects_cumulative_capacity(suite)
 	_test_take_all_offer_is_collectively_grantable(suite)
+	_test_pick_any_options_resolve_independently(suite)
 	_test_failed_purchase_preserves_offer(suite)
 	_test_team_capacity_failure_preserves_purchase(suite)
 	_test_reward_definitions_validate(suite)
@@ -376,8 +377,86 @@ static func _test_take_all_offer_is_collectively_grantable(
 			"The take-all Currency should grant with the Unit."
 	)
 	suite.assert_true(
-			run_state.get_phase() == GameEnums.RunPhase.READY,
-			"A successful take-all claim should return the Run to ready."
+		run_state.get_phase() == GameEnums.RunPhase.READY,
+		"A successful take-all claim should return the Run to ready."
+	)
+
+
+static func _test_pick_any_options_resolve_independently(
+		suite: TestSuite
+) -> void:
+	var run_state: RunState = _create_run_with_capacity(0, 1, 1)
+	var unit_payload: UnitRewardDefinition = UnitRewardDefinition.new()
+	unit_payload.unit_definition = load(
+		"res://content/units/debug_run_recruit.tres"
+	) as UnitDefinition
+	var gold_payload: CurrencyRewardDefinition = CurrencyRewardDefinition.new()
+	gold_payload.amount = 5
+	var offer: RewardOffer = RewardOffer.new()
+	offer.offer_id = 1
+	offer.rule = GameEnums.RewardOfferRule.PICK_ANY
+	for payload: RewardPayloadDefinition in [unit_payload, gold_payload]:
+		var option: RewardOption = RewardOption.new()
+		option.option_id = offer.options.size() + 1
+		option.payload = payload
+		offer.options.append(option)
+	var transaction: RunTransaction = RunTransaction.begin(run_state)
+	transaction.working_state._set_active_offer(offer)
+	transaction.working_state._set_phase(
+		GameEnums.RunPhase.CHOOSING_REWARD
+	)
+	suite.assert_true(
+		transaction.commit(),
+		"A pick-any test offer should commit to the Run."
+	)
+	var service: RewardOfferService = RewardOfferService.new()
+	var rejected: RunCommandResult = service.claim_option(
+		run_state,
+		offer.offer_id,
+		1
+	)
+	suite.assert_true(
+		rejected.code == GameEnums.RunCommandCode.TEAM_FULL,
+		"A failed pick-any option should report only its current constraint."
+	)
+	suite.assert_true(
+		run_state.get_active_offer().get_option(1).status
+		== GameEnums.RewardOptionStatus.AVAILABLE,
+		"A failed pick-any option must remain available."
+	)
+	suite.assert_true(
+		service.claim_option(run_state, offer.offer_id, 2).succeeded(),
+		"Another pick-any option should remain independently claimable."
+	)
+	suite.assert_int_equal(
+		5,
+		run_state.get_gold(),
+		"A claimed pick-any Currency option should grant its payload."
+	)
+	suite.assert_true(
+		run_state.get_active_offer() != null,
+		"Claiming one pick-any option must not close the Offer."
+	)
+	suite.assert_true(
+		service.skip_option(run_state, offer.offer_id, 1).succeeded(),
+		"An available pick-any option should be individually skippable."
+	)
+	suite.assert_true(
+		run_state.get_active_offer().get_option(1).status
+		== GameEnums.RewardOptionStatus.SKIPPED,
+		"Skipped pick-any options should retain an explicit status."
+	)
+	suite.assert_true(
+		service.finish_offer(run_state, offer.offer_id).succeeded(),
+		"Players should explicitly finish a pick-any Offer."
+	)
+	suite.assert_true(
+		run_state.get_active_offer() == null,
+		"Finishing a pick-any Offer should remove it from the Run."
+	)
+	suite.assert_true(
+		run_state.get_phase() == GameEnums.RunPhase.READY,
+		"A standalone pick-any Offer should return the Run to ready."
 	)
 
 

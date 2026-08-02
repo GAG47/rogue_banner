@@ -5,6 +5,8 @@ signal deployment_start_requested
 signal deployment_reset_requested
 signal art_selected(slot_index: int)
 signal art_use_requested
+signal scroll_selected(stack_instance_id: int)
+signal scroll_use_requested
 signal end_turn_requested
 signal battle_restart_requested
 
@@ -20,10 +22,19 @@ signal battle_restart_requested
 @export var art_detail_label: Label
 @export var use_art_button: Button
 @export var intent_label: Label
+@export var relic_label: Label
+@export var scroll_selector: OptionButton
+@export var scroll_detail_label: Label
+@export var use_scroll_button: Button
 @export var end_turn_button: Button
 @export var restart_battle_button: Button
 
 var _listed_art_slots: Array[int] = []
+var _listed_scroll_ids: Array[int] = []
+
+
+func set_restart_available(available: bool) -> void:
+	restart_battle_button.visible = available
 
 
 func _ready() -> void:
@@ -39,6 +50,10 @@ func _ready() -> void:
 		art_selector.item_selected.connect(_on_art_item_selected)
 	if not use_art_button.pressed.is_connected(_on_use_art_pressed):
 		use_art_button.pressed.connect(_on_use_art_pressed)
+	if not scroll_selector.item_selected.is_connected(_on_scroll_item_selected):
+		scroll_selector.item_selected.connect(_on_scroll_item_selected)
+	if not use_scroll_button.pressed.is_connected(_on_use_scroll_pressed):
+		use_scroll_button.pressed.connect(_on_use_scroll_pressed)
 	if not end_turn_button.pressed.is_connected(_on_end_turn_pressed):
 		end_turn_button.pressed.connect(_on_end_turn_pressed)
 	if not restart_battle_button.pressed.is_connected(
@@ -52,6 +67,8 @@ func present(
 		selected_unit_id: int,
 		selected_art_slot_index: int,
 		pending_art_slot_index: int,
+		selected_scroll_stack_id: int,
+		pending_scroll_stack_id: int,
 		deployed_count: int,
 		deployment_total: int,
 		next_deployment_name: String
@@ -72,7 +89,9 @@ func present(
 		model,
 		selected_unit_id,
 		selected_art_slot_index,
-		pending_art_slot_index
+		pending_art_slot_index,
+		selected_scroll_stack_id,
+		pending_scroll_stack_id
 	)
 
 
@@ -100,7 +119,9 @@ func _present_battle(
 		model: BattleReadModel,
 		selected_unit_id: int,
 		selected_art_slot_index: int,
-		pending_art_slot_index: int
+		pending_art_slot_index: int,
+		selected_scroll_stack_id: int,
+		pending_scroll_stack_id: int
 ) -> int:
 	if model == null:
 		_present_unavailable()
@@ -118,11 +139,72 @@ func _present_battle(
 		pending_art_slot_index
 	)
 	_present_intents(model)
+	_present_run_items(
+		model,
+		selected_unit,
+		selected_scroll_stack_id,
+		pending_scroll_stack_id
+	)
 	end_turn_button.disabled = (
 		model.phase != GameEnums.BattlePhase.PLAYER_TURN
 		or model.active_side != GameEnums.BattleSide.PLAYER
 	)
 	return resolved_slot
+
+
+func _present_run_items(
+	model: BattleReadModel,
+	selected_unit: BattleUnitReadModel,
+	selected_scroll_stack_id: int,
+	pending_scroll_stack_id: int
+) -> void:
+	var relic_names: Array[String] = []
+	for relic: BattleRelicReadModel in model.relics:
+		relic_names.append(relic.display_name)
+	relic_label.text = "遗物：%s" % (
+		"、".join(relic_names) if not relic_names.is_empty() else "无"
+	)
+	_listed_scroll_ids.clear()
+	scroll_selector.set_block_signals(true)
+	scroll_selector.clear()
+	var selected_item: int = -1
+	for scroll: BattleScrollReadModel in model.scrolls:
+		scroll_selector.add_item("%s × %d" % [
+			scroll.display_name,
+			scroll.quantity,
+		])
+		_listed_scroll_ids.append(scroll.stack_instance_id)
+		if scroll.stack_instance_id == selected_scroll_stack_id:
+			selected_item = _listed_scroll_ids.size() - 1
+	if selected_item < 0 and not _listed_scroll_ids.is_empty():
+		selected_item = 0
+	if selected_item >= 0:
+		scroll_selector.select(selected_item)
+	scroll_selector.disabled = _listed_scroll_ids.is_empty()
+	scroll_selector.set_block_signals(false)
+	var selected_scroll: BattleScrollReadModel
+	if selected_item >= 0:
+		selected_scroll = model.scrolls[selected_item]
+	if selected_scroll == null:
+		scroll_detail_label.text = "卷轴：无"
+		use_scroll_button.disabled = true
+		return
+	scroll_detail_label.text = "%s · 数量%d · 射程%d—%d" % [
+		selected_scroll.display_name,
+		selected_scroll.quantity,
+		selected_scroll.minimum_range,
+		selected_scroll.maximum_range,
+	]
+	use_scroll_button.text = (
+		"取消卷轴目标选择" if pending_scroll_stack_id > 0 else "使用卷轴"
+	)
+	use_scroll_button.disabled = (
+		selected_unit == null
+		or selected_unit.side != GameEnums.BattleSide.PLAYER
+		or selected_scroll.quantity <= 0
+		or model.phase != GameEnums.BattlePhase.PLAYER_TURN
+		or model.active_side != GameEnums.BattleSide.PLAYER
+	)
 
 
 func _present_selected_unit(unit: BattleUnitReadModel) -> void:
@@ -296,6 +378,11 @@ func _present_unavailable() -> void:
 	art_detail_label.text = "技艺：不可用"
 	intent_label.text = "意图：不可用"
 	use_art_button.disabled = true
+	scroll_selector.clear()
+	scroll_selector.disabled = true
+	scroll_detail_label.text = "卷轴：不可用"
+	relic_label.text = "遗物：不可用"
+	use_scroll_button.disabled = true
 	end_turn_button.disabled = true
 
 
@@ -316,6 +403,17 @@ func _on_art_item_selected(item_index: int) -> void:
 
 func _on_use_art_pressed() -> void:
 	art_use_requested.emit()
+
+
+func _on_scroll_item_selected(item_index: int) -> void:
+	if item_index < 0 or item_index >= _listed_scroll_ids.size():
+		scroll_selected.emit(0)
+		return
+	scroll_selected.emit(_listed_scroll_ids[item_index])
+
+
+func _on_use_scroll_pressed() -> void:
+	scroll_use_requested.emit()
 
 
 func _on_end_turn_pressed() -> void:

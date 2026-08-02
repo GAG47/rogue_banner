@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="MapEventDefinition" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/map_event_definition.gd" id="1_event"]
+[ext_resource type="Script" path="res://scripts/map/map_event_choice_definition.gd" id="2_choice"]
+[ext_resource type="Script" path="res://scripts/map/map_event_outcome_definition.gd" id="3_outcome"]
+[ext_resource type="Script" path="res://scripts/map/change_gold_map_operation_definition.gd" id="4_gold"]
+[ext_resource type="Script" path="res://scripts/map/heal_unit_map_operation_definition.gd" id="5_heal"]
+
+[sub_resource type="Resource" id="Operation_gold"]
+script = ExtResource("4_gold")
+amount = 10
+
+[sub_resource type="Resource" id="Outcome_gold"]
+script = ExtResource("3_outcome")
+outcome_id = &"take_supplies_result"
+operations = [SubResource("Operation_gold")]
+
+[sub_resource type="Resource" id="Choice_gold"]
+script = ExtResource("2_choice")
+choice_id = &"take_supplies"
+display_name = "接受补给：获得10金币"
+outcomes = [SubResource("Outcome_gold")]
+
+[sub_resource type="Resource" id="Operation_heal"]
+script = ExtResource("5_heal")
+amount = 4
+
+[sub_resource type="Resource" id="Outcome_heal"]
+script = ExtResource("3_outcome")
+outcome_id = &"field_treatment_result"
+operations = [SubResource("Operation_heal")]
+
+[sub_resource type="Resource" id="Choice_heal"]
+script = ExtResource("2_choice")
+choice_id = &"field_treatment"
+display_name = "请求治疗：为一名单位恢复4点生命"
+outcomes = [SubResource("Outcome_heal")]
+
+[resource]
+script = ExtResource("1_event")
+content_id = &"v8_crossroads_event"
+display_name = "路边补给队"
+choices = [SubResource("Choice_gold"), SubResource("Choice_heal")]

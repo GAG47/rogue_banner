@@ -1,0 +1,132 @@
+[gd_resource type="Resource" script_class="MapDefinition" load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/map/map_definition.gd" id="1_map"]
+[ext_resource type="Script" path="res://scripts/map/map_node_definition.gd" id="2_node"]
+[ext_resource type="Script" path="res://scripts/map/map_node_pool_entry.gd" id="3_entry"]
+[ext_resource type="Script" path="res://scripts/map/encounter_map_node_definition.gd" id="4_encounter_node"]
+[ext_resource type="Script" path="res://scripts/map/shop_map_node_definition.gd" id="5_shop_node"]
+[ext_resource type="Script" path="res://scripts/map/event_map_node_definition.gd" id="6_event_node"]
+[ext_resource type="Script" path="res://scripts/map/camp_map_node_definition.gd" id="7_camp_node"]
+[ext_resource type="Script" path="res://scripts/map/chest_map_node_definition.gd" id="8_chest_node"]
+[ext_resource type="Resource" path="res://content/encounters/v8_standard_encounter.tres" id="9_standard"]
+[ext_resource type="Resource" path="res://content/encounters/v8_elite_encounter.tres" id="10_elite"]
+[ext_resource type="Resource" path="res://content/encounters/v8_boss_encounter.tres" id="11_boss"]
+[ext_resource type="Resource" path="res://content/rewards/v8_shop_reward_pool.tres" id="12_shop_pool"]
+[ext_resource type="Resource" path="res://content/rewards/v8_chest_reward_pool.tres" id="13_chest_pool"]
+[ext_resource type="Resource" path="res://content/map_events/v8_crossroads_event.tres" id="14_event"]
+[ext_resource type="Resource" path="res://content/map_events/v8_camp.tres" id="15_camp"]
+
+[sub_resource type="Resource" id="Node_start"]
+script = ExtResource("2_node")
+content_id = &"v8_route_start"
+display_name = "远征起点"
+kind = 0
+
+[sub_resource type="Resource" id="Node_battle"]
+script = ExtResource("4_encounter_node")
+content_id = &"v8_route_battle"
+display_name = "前线交锋"
+kind = 1
+encounter = ExtResource("9_standard")
+
+[sub_resource type="Resource" id="Node_shop"]
+script = ExtResource("5_shop_node")
+content_id = &"v8_route_shop"
+display_name = "行商营帐"
+kind = 4
+reward_pool = ExtResource("12_shop_pool")
+
+[sub_resource type="Resource" id="Node_event"]
+script = ExtResource("6_event_node")
+content_id = &"v8_route_event"
+display_name = "岔路奇遇"
+kind = 7
+event_definition = ExtResource("14_event")
+
+[sub_resource type="Resource" id="Node_camp"]
+script = ExtResource("7_camp_node")
+content_id = &"v8_route_camp"
+display_name = "行军营地"
+kind = 5
+camp_definition = ExtResource("15_camp")
+
+[sub_resource type="Resource" id="Node_chest"]
+script = ExtResource("8_chest_node")
+content_id = &"v8_route_chest"
+display_name = "遗落军箱"
+kind = 6
+reward_pool = ExtResource("13_chest_pool")
+
+[sub_resource type="Resource" id="Node_elite"]
+script = ExtResource("4_encounter_node")
+content_id = &"v8_route_elite"
+display_name = "重兵防线"
+kind = 2
+encounter = ExtResource("10_elite")
+
+[sub_resource type="Resource" id="Node_boss"]
+script = ExtResource("4_encounter_node")
+content_id = &"v8_route_boss"
+display_name = "旗主决战"
+kind = 3
+encounter = ExtResource("11_boss")
+
+[sub_resource type="Resource" id="Entry_battle"]
+script = ExtResource("3_entry")
+node_definition = SubResource("Node_battle")
+minimum_layer = 1
+maximum_layer = 1
+minimum_copies = 1
+maximum_copies = 1
+
+[sub_resource type="Resource" id="Entry_shop"]
+script = ExtResource("3_entry")
+node_definition = SubResource("Node_shop")
+minimum_layer = 2
+maximum_layer = 2
+minimum_copies = 1
+maximum_copies = 1
+
+[sub_resource type="Resource" id="Entry_event"]
+script = ExtResource("3_entry")
+node_definition = SubResource("Node_event")
+minimum_layer = 3
+maximum_layer = 3
+minimum_copies = 1
+maximum_copies = 1
+
+[sub_resource type="Resource" id="Entry_camp"]
+script = ExtResource("3_entry")
+node_definition = SubResource("Node_camp")
+minimum_layer = 4
+maximum_layer = 4
+minimum_copies = 1
+maximum_copies = 1
+
+[sub_resource type="Resource" id="Entry_chest"]
+script = ExtResource("3_entry")
+node_definition = SubResource("Node_chest")
+minimum_layer = 5
+maximum_layer = 5
+minimum_copies = 1
+maximum_copies = 1
+
+[sub_resource type="Resource" id="Entry_elite"]
+script = ExtResource("3_entry")
+node_definition = SubResource("Node_elite")
+minimum_layer = 6
+maximum_layer = 6
+minimum_copies = 1
+maximum_copies = 1
+
+[resource]
+script = ExtResource("1_map")
+content_id = &"v8_first_route"
+display_name = "第一远征路线"
+layer_count = 6
+minimum_nodes_per_layer = 1
+maximum_nodes_per_layer = 1
+extra_connection_chance = 0.0
+start_node = SubResource("Node_start")
+boss_node = SubResource("Node_boss")
+node_pool = [SubResource("Entry_battle"), SubResource("Entry_shop"), SubResource("Entry_event"), SubResource("Entry_camp"), SubResource("Entry_chest"), SubResource("Entry_elite")]

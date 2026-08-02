@@ -398,6 +398,7 @@ enum RewardOfferRule {
 	PICK_ONE,
 	TAKE_ALL,
 	PURCHASE_ANY,
+	PICK_ANY,
 }
 
 enum RewardSource {
@@ -419,6 +420,7 @@ enum RewardOptionStatus {
 	CLAIMED,
 	SOLD,
 	CLOSED,
+	SKIPPED,
 }
 
 enum RewardGenerationMode {
