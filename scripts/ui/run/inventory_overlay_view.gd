@@ -18,6 +18,7 @@ signal closed
 @export var close_button: Button
 
 var _inventory: InventoryReadModel
+var _editable: bool = false
 
 
 func _ready() -> void:
@@ -32,8 +33,9 @@ func _ready() -> void:
 	close_button.pressed.connect(func() -> void: closed.emit())
 
 
-func present(inventory: InventoryReadModel) -> void:
+func present(inventory: InventoryReadModel, editable: bool = false) -> void:
 	_inventory = inventory
+	_editable = editable
 	visible = true
 	unit_selector.clear()
 	art_selector.clear()
@@ -73,6 +75,11 @@ func present(inventory: InventoryReadModel) -> void:
 	relic_label.text = "遗物：%s" % (
 		"、".join(relic_names) if not relic_names.is_empty() else "无"
 	)
+	install_button.disabled = not _editable
+	uninstall_button.disabled = not _editable
+	upgrade_button.disabled = not _editable
+	forget_button.disabled = not _editable
+	discard_scroll_button.disabled = not _editable
 	_rebuild_slots()
 
 

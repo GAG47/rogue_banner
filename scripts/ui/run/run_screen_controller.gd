@@ -6,7 +6,6 @@ const RUN_SEED: int = 20260802
 @export_category("Views")
 @export var shell_header: Control
 @export var shell_content: Control
-@export var shell_footer: Control
 @export var header_view: RunHeaderView
 @export var map_panel: MapPanelView
 @export var deployment_panel: DeploymentPanelView
@@ -16,7 +15,10 @@ const RUN_SEED: int = 20260802
 @export var event_panel: EventPanelView
 @export var result_panel: RunResultView
 @export var inventory_overlay: InventoryOverlayView
+@export var settings_overlay: SettingsOverlayView
+@export var feedback_toast: Control
 @export var feedback_label: Label
+@export var feedback_timer: Timer
 
 @export_category("Starting Content")
 @export var hero_definition: HeroDefinition
@@ -26,6 +28,8 @@ const RUN_SEED: int = 20260802
 var _session: RunSessionController = RunSessionController.new()
 var _snapshot: RunSessionSnapshot
 var _bound_battle: BattleState
+var _map_overlay_open: bool = false
+var _tooltips_enabled: bool = true
 
 
 func _ready() -> void:
@@ -35,7 +39,7 @@ func _ready() -> void:
 
 func start_new_run() -> bool:
 	if hero_definition == null or map_definition == null:
-		_set_feedback("v8 初始内容配置不完整。")
+		_show_feedback("v8 初始内容配置不完整。")
 		return false
 	var setup: RunSetup = RunSetup.create(
 		hero_definition,
@@ -50,7 +54,10 @@ func start_new_run() -> bool:
 		starting_scrolls
 	)
 	_bound_battle = null
-	_present_result(result, "远征已经开始。选择第一个路线节点。")
+	_map_overlay_open = false
+	inventory_overlay.visible = false
+	settings_overlay.visible = false
+	_present_result(result, "")
 	return result.succeeded
 
 
@@ -67,22 +74,39 @@ func _refresh() -> void:
 	if _snapshot == null:
 		return
 	var in_battle: bool = _snapshot.route == RunSessionRoute.Value.BATTLE
+	if in_battle:
+		_map_overlay_open = false
+	var map_visible: bool = (
+		_snapshot.route == RunSessionRoute.Value.MAP
+		or _map_overlay_open
+	)
 	shell_header.visible = not in_battle
-	shell_footer.visible = not in_battle
-	shell_content.offset_top = 0.0 if in_battle else 82.0
-	shell_content.offset_bottom = 0.0 if in_battle else -62.0
-	header_view.present(_snapshot.summary, _snapshot.route)
-	map_panel.visible = _snapshot.route == RunSessionRoute.Value.MAP
+	shell_content.offset_top = 0.0 if in_battle else 64.0
+	shell_content.offset_bottom = 0.0
+	header_view.present(
+		_snapshot.summary,
+		_snapshot.inventory,
+		_snapshot.route,
+		map_visible
+	)
+	map_panel.visible = map_visible
 	deployment_panel.visible = (
-		_snapshot.route == RunSessionRoute.Value.DEPLOYMENT
+		not map_visible
+		and _snapshot.route == RunSessionRoute.Value.DEPLOYMENT
 	)
 	battle_host.visible = in_battle
-	reward_panel.visible = _snapshot.route in [
+	reward_panel.visible = not map_visible and _snapshot.route in [
 		RunSessionRoute.Value.REWARD,
 		RunSessionRoute.Value.SHOP,
 	]
-	event_panel.visible = _snapshot.route == RunSessionRoute.Value.EVENT
-	result_panel.visible = _snapshot.route == RunSessionRoute.Value.RESULT
+	event_panel.visible = (
+		not map_visible
+		and _snapshot.route == RunSessionRoute.Value.EVENT
+	)
+	result_panel.visible = (
+		not map_visible
+		and _snapshot.route == RunSessionRoute.Value.RESULT
+	)
 	if map_panel.visible:
 		map_panel.present(_snapshot.map)
 	if deployment_panel.visible:
@@ -109,8 +133,9 @@ func _refresh() -> void:
 
 
 func _connect_interface() -> void:
-	header_view.inventory_requested.connect(_on_inventory_requested)
-	header_view.abandon_requested.connect(_on_abandon_requested)
+	header_view.map_requested.connect(_on_map_requested)
+	header_view.build_requested.connect(_on_build_requested)
+	header_view.settings_requested.connect(_on_settings_requested)
 	map_panel.node_requested.connect(_on_node_requested)
 	deployment_panel.battle_start_requested.connect(_on_battle_start_requested)
 	battle_screen.external_battle_continue_requested.connect(
@@ -126,6 +151,12 @@ func _connect_interface() -> void:
 	event_panel.result_execute_requested.connect(_on_event_execute_requested)
 	inventory_overlay.command_requested.connect(_on_inventory_command_requested)
 	inventory_overlay.closed.connect(_on_inventory_closed)
+	settings_overlay.closed.connect(_on_settings_closed)
+	settings_overlay.abandon_requested.connect(_on_abandon_requested)
+	settings_overlay.tooltips_changed.connect(_on_tooltips_changed)
+	feedback_timer.timeout.connect(
+		func() -> void: feedback_toast.visible = false
+	)
 	result_panel.new_run_requested.connect(start_new_run)
 
 
@@ -203,9 +234,39 @@ func _on_event_execute_requested(request: MapEventResolveRequest) -> void:
 	_present_result(_session.execute_event(request), "事件已经结算。")
 
 
-func _on_inventory_requested() -> void:
-	if _snapshot != null and _snapshot.route == RunSessionRoute.Value.MAP:
-		inventory_overlay.present(_snapshot.inventory)
+func _on_map_requested() -> void:
+	if _snapshot == null:
+		return
+	if _snapshot.route == RunSessionRoute.Value.MAP:
+		_map_overlay_open = false
+		_refresh()
+		return
+	if _snapshot.route in [
+		RunSessionRoute.Value.DEPLOYMENT,
+		RunSessionRoute.Value.REWARD,
+		RunSessionRoute.Value.SHOP,
+		RunSessionRoute.Value.EVENT,
+	]:
+		_map_overlay_open = not _map_overlay_open
+		_refresh()
+
+
+func _on_build_requested() -> void:
+	if _snapshot == null:
+		return
+	inventory_overlay.present(
+		_snapshot.inventory,
+		_snapshot.route == RunSessionRoute.Value.MAP
+	)
+
+
+func _on_settings_requested() -> void:
+	if _snapshot == null:
+		return
+	settings_overlay.present(
+		_tooltips_enabled,
+		_snapshot.route != RunSessionRoute.Value.RESULT
+	)
 
 
 func _on_inventory_closed() -> void:
@@ -216,21 +277,32 @@ func _on_inventory_command_requested(command: RunCommand) -> void:
 	var result: RunSessionResult = _session.execute_inventory_command(command)
 	_present_result(result, "队伍配置已经更新。")
 	if result.succeeded and _snapshot != null:
-		inventory_overlay.present(_snapshot.inventory)
+		inventory_overlay.present(_snapshot.inventory, true)
+
+
+func _on_settings_closed() -> void:
+	settings_overlay.visible = false
+
+
+func _on_tooltips_changed(enabled: bool) -> void:
+	_tooltips_enabled = enabled
+	map_panel.set_tooltips_enabled(enabled)
 
 
 func _on_abandon_requested() -> void:
+	settings_overlay.visible = false
 	_present_result(_session.abandon_run(), "远征已经放弃。")
 
 
-func _present_result(result: RunSessionResult, success_message: String) -> void:
-	_set_feedback(
-		success_message if result != null and result.succeeded else (
-			RunUiTextFormatter.result_text(result)
-		)
-	)
+func _present_result(result: RunSessionResult, _success_message: String) -> void:
+	if result == null or not result.succeeded:
+		_show_feedback(RunUiTextFormatter.result_text(result))
+	else:
+		_map_overlay_open = false
 	_refresh()
 
 
-func _set_feedback(message: String) -> void:
+func _show_feedback(message: String) -> void:
 	feedback_label.text = message
+	feedback_toast.visible = true
+	feedback_timer.start()

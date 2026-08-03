@@ -254,6 +254,20 @@ The v8 gate is:
 Save data, hero selection, unlocks, meta progression, final art, tutorial, and
 production presentation remain deferred.
 
+### v8.1 Route Map Presentation
+
+Implemented as the first v8 presentation pass. The flat route list is replaced
+by a full-width, vertically climbing parchment graph with compact node symbols,
+reachable highlights, completed-path state, tooltips, and automatic scrolling
+to the current node. The formal route contains thirteen variable-width regular
+layers and one Boss layer. Adjacent layers use deterministic sparse,
+non-crossing connections rather than complete bipartite links. Generated route
+facts, reachability, sessions, and progression remain owned by the v6 Map
+system. The same pass replaces the oversized diagnostic Run header with a
+compact Hero, Gold, Scroll-slot, Map, Build, and Settings bar; removes the
+permanent feedback footer; and changes Map nodes to clear compact icons with
+reachable outlines and hover enlargement.
+
 ## Phase 9: Heroes and Meta Progression
 
 Complete:

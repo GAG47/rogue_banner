@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/run/run_screen_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://scripts/ui/run/run_header_view.gd" id="2_header"]
@@ -12,6 +12,8 @@
 [ext_resource type="Resource" path="res://content/heroes/v8_banner_captain.tres" id="10_hero"]
 [ext_resource type="Resource" path="res://content/maps/v8_first_route.tres" id="11_map"]
 [ext_resource type="Resource" path="res://content/scrolls/debug_blast_scroll.tres" id="12_scroll"]
+[ext_resource type="Script" path="res://scripts/ui/run/map_route_graph_view.gd" id="13_map_graph"]
+[ext_resource type="Script" path="res://scripts/ui/run/settings_overlay_view.gd" id="14_settings"]
 
 [sub_resource type="StyleBoxFlat" id="Style_panel"]
 bg_color = Color(0.065, 0.09, 0.125, 0.98)
@@ -25,10 +27,34 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
+[sub_resource type="StyleBoxFlat" id="Style_map"]
+bg_color = Color(0.125, 0.09, 0.055, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.28, 0.2, 0.12, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
 [sub_resource type="StyleBoxFlat" id="Style_feedback"]
 bg_color = Color(0.04, 0.06, 0.085, 0.98)
 border_width_top = 1
 border_color = Color(0.23, 0.76, 0.7, 0.7)
+
+[sub_resource type="StyleBoxFlat" id="Style_toast"]
+bg_color = Color(0.055, 0.075, 0.095, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.85, 0.48, 0.35, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [sub_resource type="StyleBoxFlat" id="Style_overlay"]
 bg_color = Color(0.075, 0.105, 0.145, 1)
@@ -42,7 +68,7 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[node name="RunScreen" type="Control" node_paths=PackedStringArray("shell_header", "shell_content", "shell_footer", "header_view", "map_panel", "deployment_panel", "battle_host", "battle_screen", "reward_panel", "event_panel", "result_panel", "inventory_overlay", "feedback_label")]
+[node name="RunScreen" type="Control" node_paths=PackedStringArray("shell_header", "shell_content", "header_view", "map_panel", "deployment_panel", "battle_host", "battle_screen", "reward_panel", "event_panel", "result_panel", "inventory_overlay", "settings_overlay", "feedback_toast", "feedback_label", "feedback_timer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -52,7 +78,6 @@ grow_vertical = 2
 script = ExtResource("1_controller")
 shell_header = NodePath("Header")
 shell_content = NodePath("Content")
-shell_footer = NodePath("Footer")
 header_view = NodePath("Header/HeaderMargin/HeaderRow")
 map_panel = NodePath("Content/ContentMargin/MapPanel")
 deployment_panel = NodePath("Content/ContentMargin/DeploymentPanel")
@@ -62,7 +87,10 @@ reward_panel = NodePath("Content/ContentMargin/RewardPanel")
 event_panel = NodePath("Content/ContentMargin/EventPanel")
 result_panel = NodePath("Content/ContentMargin/RunResultPanel")
 inventory_overlay = NodePath("InventoryOverlay")
-feedback_label = NodePath("Footer/FeedbackLabel")
+settings_overlay = NodePath("SettingsOverlay")
+feedback_toast = NodePath("FeedbackToast")
+feedback_label = NodePath("FeedbackToast/FeedbackLabel")
+feedback_timer = NodePath("FeedbackTimer")
 hero_definition = ExtResource("10_hero")
 map_definition = ExtResource("11_map")
 starting_scrolls = Array[ExtResource("12_scroll")]([ExtResource("12_scroll")])
@@ -81,80 +109,74 @@ color = Color(0.024, 0.034, 0.047, 1)
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_bottom = 82.0
+offset_bottom = 64.0
 grow_horizontal = 2
 theme_override_styles/panel = SubResource("Style_feedback")
 
 [node name="HeaderMargin" type="MarginContainer" parent="Header"]
 layout_mode = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 7
 
-[node name="HeaderRow" type="HBoxContainer" parent="Header/HeaderMargin" node_paths=PackedStringArray("run_title_label", "phase_label", "gold_label", "team_label", "relic_label", "scroll_label", "inventory_button", "abandon_button")]
+[node name="HeaderRow" type="HBoxContainer" parent="Header/HeaderMargin" node_paths=PackedStringArray("hero_portrait", "gold_label", "scroll_slot_row", "map_button", "build_button", "settings_button")]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 12
 script = ExtResource("2_header")
-run_title_label = NodePath("RunTitleLabel")
-phase_label = NodePath("PhaseLabel")
+hero_portrait = NodePath("HeroPortrait")
 gold_label = NodePath("GoldLabel")
-team_label = NodePath("TeamLabel")
-relic_label = NodePath("RelicLabel")
-scroll_label = NodePath("ScrollLabel")
-inventory_button = NodePath("InventoryButton")
-abandon_button = NodePath("AbandonButton")
+scroll_slot_row = NodePath("ScrollSlotRow")
+map_button = NodePath("MapButton")
+build_button = NodePath("BuildButton")
+settings_button = NodePath("SettingsButton")
 
-[node name="RunTitleLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+[node name="HeroPortrait" type="TextureRect" parent="Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(48, 48)
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_colors/font_color = Color(0.9, 0.95, 0.98, 1)
-theme_override_font_sizes/font_size = 24
-text = "远征"
-
-[node name="PhaseLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
-text = "路线地图"
-vertical_alignment = 1
+expand_mode = 1
+stretch_mode = 5
 
 [node name="GoldLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(108, 0)
 layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.78, 0.31, 1)
+theme_override_font_sizes/font_size = 18
 text = "金币 0"
 vertical_alignment = 1
 
-[node name="TeamLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+[node name="ScrollSlotRow" type="HBoxContainer" parent="Header/HeaderMargin/HeaderRow"]
 layout_mode = 2
-text = "队伍 0/0"
-vertical_alignment = 1
+theme_override_constants/separation = 6
 
-[node name="RelicLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+[node name="HeaderSpacer" type="Control" parent="Header/HeaderMargin/HeaderRow"]
 layout_mode = 2
-text = "遗物 0"
-vertical_alignment = 1
+size_flags_horizontal = 3
 
-[node name="ScrollLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
+[node name="MapButton" type="Button" parent="Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(72, 40)
 layout_mode = 2
-text = "卷轴 0/0"
-vertical_alignment = 1
+toggle_mode = true
+text = "地图"
+tooltip_text = "打开或关闭路线地图"
 
-[node name="InventoryButton" type="Button" parent="Header/HeaderMargin/HeaderRow"]
-custom_minimum_size = Vector2(92, 42)
+[node name="BuildButton" type="Button" parent="Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(106, 40)
 layout_mode = 2
-text = "队伍构筑"
+text = "当前构筑"
+tooltip_text = "查看单位、状态和技艺"
 
-[node name="AbandonButton" type="Button" parent="Header/HeaderMargin/HeaderRow"]
-custom_minimum_size = Vector2(84, 42)
+[node name="SettingsButton" type="Button" parent="Header/HeaderMargin/HeaderRow"]
+custom_minimum_size = Vector2(66, 40)
 layout_mode = 2
-text = "放弃远征"
+text = "设置"
 
 [node name="Content" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 82.0
-offset_bottom = -62.0
+offset_top = 64.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -170,50 +192,36 @@ theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 34
 theme_override_constants/margin_bottom = 24
 
-[node name="MapPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("node_list", "node_detail_label")]
+[node name="MapPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("route_scroll", "route_graph")]
 layout_mode = 2
-theme_override_styles/panel = SubResource("Style_panel")
+theme_override_styles/panel = SubResource("Style_map")
 script = ExtResource("3_map")
-node_list = NodePath("MapMargin/MapRow/RouteScroll/NodeList")
-node_detail_label = NodePath("MapMargin/MapRow/MapInfo/NodeDetailLabel")
+route_scroll = NodePath("MapMargin/MapRow/RouteScroll")
+route_graph = NodePath("MapMargin/MapRow/RouteScroll/NodeList")
 
 [node name="MapMargin" type="MarginContainer" parent="Content/ContentMargin/MapPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
 
 [node name="MapRow" type="HBoxContainer" parent="Content/ContentMargin/MapPanel/MapMargin"]
 layout_mode = 2
 theme_override_constants/separation = 30
 
 [node name="RouteScroll" type="ScrollContainer" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow"]
-custom_minimum_size = Vector2(540, 0)
+custom_minimum_size = Vector2(980, 0)
 layout_mode = 2
 size_flags_horizontal = 3
+horizontal_scroll_mode = 0
 
-[node name="NodeList" type="VBoxContainer" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow/RouteScroll"]
+[node name="NodeList" type="Control" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow/RouteScroll"]
+custom_minimum_size = Vector2(980, 1780)
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 10
-
-[node name="MapInfo" type="VBoxContainer" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow"]
-custom_minimum_size = Vector2(360, 0)
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="MapTitleLabel" type="Label" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow/MapInfo"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
-theme_override_font_sizes/font_size = 26
-text = "远征路线"
-
-[node name="NodeDetailLabel" type="Label" parent="Content/ContentMargin/MapPanel/MapMargin/MapRow/MapInfo"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.72, 0.81, 0.89, 1)
-text = "选择一个节点继续。"
-autowrap_mode = 2
+mouse_filter = 2
+script = ExtResource("13_map_graph")
 
 [node name="DeploymentPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("encounter_label", "unit_selector", "deployment_grid", "deployed_unit_list", "start_battle_button", "reset_button")]
 visible = false
@@ -455,23 +463,31 @@ custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "开始新远征"
 
-[node name="Footer" type="PanelContainer" parent="."]
+[node name="FeedbackToast" type="PanelContainer" parent="."]
+visible = false
 layout_mode = 1
-anchors_preset = 12
+anchor_left = 0.5
 anchor_top = 1.0
-anchor_right = 1.0
+anchor_right = 0.5
 anchor_bottom = 1.0
-offset_top = -62.0
+offset_left = -280.0
+offset_top = -72.0
+offset_right = 280.0
+offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_styles/panel = SubResource("Style_feedback")
+theme_override_styles/panel = SubResource("Style_toast")
 
-[node name="FeedbackLabel" type="Label" parent="Footer"]
+[node name="FeedbackLabel" type="Label" parent="FeedbackToast"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.76, 0.93, 0.9, 1)
-text = "正在准备远征……"
+theme_override_colors/font_color = Color(1, 0.86, 0.78, 1)
+text = "操作失败。"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="FeedbackTimer" type="Timer" parent="."]
+wait_time = 3.0
+one_shot = true
 
 [node name="InventoryOverlay" type="ColorRect" parent="." node_paths=PackedStringArray("summary_label", "relic_label", "unit_selector", "art_selector", "slot_selector", "scroll_selector", "install_button", "uninstall_button", "upgrade_button", "forget_button", "discard_scroll_button", "close_button")]
 visible = false
@@ -582,3 +598,75 @@ text = "丢弃一张卷轴"
 custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 text = "关闭"
+
+[node name="SettingsOverlay" type="ColorRect" parent="." node_paths=PackedStringArray("fullscreen_check_box", "tooltip_check_box", "abandon_run_button", "close_button")]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.01, 0.015, 0.022, 0.84)
+script = ExtResource("14_settings")
+fullscreen_check_box = NodePath("SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent/FullscreenCheckBox")
+tooltip_check_box = NodePath("SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent/TooltipCheckBox")
+abandon_run_button = NodePath("SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent/AbandonRunButton")
+close_button = NodePath("SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent/CloseButton")
+
+[node name="SettingsCenter" type="CenterContainer" parent="SettingsOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SettingsPanel" type="PanelContainer" parent="SettingsOverlay/SettingsCenter"]
+custom_minimum_size = Vector2(460, 330)
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_overlay")
+
+[node name="SettingsMargin" type="MarginContainer" parent="SettingsOverlay/SettingsCenter/SettingsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 34
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 34
+theme_override_constants/margin_bottom = 28
+
+[node name="SettingsContent" type="VBoxContainer" parent="SettingsOverlay/SettingsCenter/SettingsPanel/SettingsMargin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="TitleLabel" type="Label" parent="SettingsOverlay/SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_font_sizes/font_size = 28
+text = "设置"
+horizontal_alignment = 1
+
+[node name="FullscreenCheckBox" type="CheckBox" parent="SettingsOverlay/SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+text = "全屏显示"
+
+[node name="TooltipCheckBox" type="CheckBox" parent="SettingsOverlay/SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+button_pressed = true
+text = "显示地图节点提示"
+
+[node name="SettingsSpacer" type="Control" parent="SettingsOverlay/SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="AbandonRunButton" type="Button" parent="SettingsOverlay/SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "放弃本次远征"
+
+[node name="CloseButton" type="Button" parent="SettingsOverlay/SettingsCenter/SettingsPanel/SettingsMargin/SettingsContent"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+text = "返回游戏"

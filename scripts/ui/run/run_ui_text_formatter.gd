@@ -42,6 +42,27 @@ static func node_kind_text(kind: GameEnums.MapNodeKind) -> String:
 	return "未知"
 
 
+static func node_kind_symbol(kind: GameEnums.MapNodeKind) -> String:
+	match kind:
+		GameEnums.MapNodeKind.START:
+			return "⚑"
+		GameEnums.MapNodeKind.BATTLE:
+			return "⚔"
+		GameEnums.MapNodeKind.ELITE:
+			return "✦"
+		GameEnums.MapNodeKind.BOSS:
+			return "♛"
+		GameEnums.MapNodeKind.SHOP:
+			return "¤"
+		GameEnums.MapNodeKind.CAMP:
+			return "♨"
+		GameEnums.MapNodeKind.CHEST:
+			return "◆"
+		GameEnums.MapNodeKind.EVENT:
+			return "?"
+	return "·"
+
+
 static func result_text(result: RunSessionResult) -> String:
 	if result == null:
 		return "操作没有返回结果。"

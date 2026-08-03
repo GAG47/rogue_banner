@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="MapDefinition" load_steps=20 format=3]
+[gd_resource type="Resource" script_class="MapDefinition" load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://scripts/map/map_definition.gd" id="1_map"]
 [ext_resource type="Script" path="res://scripts/map/map_node_definition.gd" id="2_node"]
@@ -26,6 +26,13 @@ kind = 0
 script = ExtResource("4_encounter_node")
 content_id = &"v8_route_battle"
 display_name = "前线交锋"
+kind = 1
+encounter = ExtResource("9_standard")
+
+[sub_resource type="Resource" id="Node_patrol"]
+script = ExtResource("4_encounter_node")
+content_id = &"v8_route_patrol"
+display_name = "巡逻部队"
 kind = 1
 encounter = ExtResource("9_standard")
 
@@ -75,58 +82,70 @@ encounter = ExtResource("11_boss")
 script = ExtResource("3_entry")
 node_definition = SubResource("Node_battle")
 minimum_layer = 1
-maximum_layer = 1
-minimum_copies = 1
-maximum_copies = 1
+maximum_layer = 13
+minimum_copies = 4
+
+[sub_resource type="Resource" id="Entry_patrol"]
+script = ExtResource("3_entry")
+node_definition = SubResource("Node_patrol")
+minimum_layer = 1
+maximum_layer = 13
+minimum_copies = 4
+weight = 0.8
 
 [sub_resource type="Resource" id="Entry_shop"]
 script = ExtResource("3_entry")
 node_definition = SubResource("Node_shop")
-minimum_layer = 2
-maximum_layer = 2
+minimum_layer = 3
+maximum_layer = 11
 minimum_copies = 1
-maximum_copies = 1
+maximum_copies = 2
+weight = 0.35
 
 [sub_resource type="Resource" id="Entry_event"]
 script = ExtResource("3_entry")
 node_definition = SubResource("Node_event")
-minimum_layer = 3
-maximum_layer = 3
-minimum_copies = 1
-maximum_copies = 1
+minimum_layer = 2
+maximum_layer = 12
+minimum_copies = 2
+maximum_copies = 5
+weight = 0.9
 
 [sub_resource type="Resource" id="Entry_camp"]
 script = ExtResource("3_entry")
 node_definition = SubResource("Node_camp")
 minimum_layer = 4
-maximum_layer = 4
+maximum_layer = 13
 minimum_copies = 1
-maximum_copies = 1
+maximum_copies = 3
+weight = 0.45
 
 [sub_resource type="Resource" id="Entry_chest"]
 script = ExtResource("3_entry")
 node_definition = SubResource("Node_chest")
 minimum_layer = 5
-maximum_layer = 5
+maximum_layer = 11
 minimum_copies = 1
-maximum_copies = 1
+maximum_copies = 2
+weight = 0.3
 
 [sub_resource type="Resource" id="Entry_elite"]
 script = ExtResource("3_entry")
 node_definition = SubResource("Node_elite")
-minimum_layer = 6
-maximum_layer = 6
-minimum_copies = 1
-maximum_copies = 1
+minimum_layer = 4
+maximum_layer = 13
+minimum_copies = 2
+maximum_copies = 4
+weight = 0.55
 
 [resource]
 script = ExtResource("1_map")
 content_id = &"v8_first_route"
 display_name = "第一远征路线"
-layer_count = 6
-minimum_nodes_per_layer = 1
-maximum_nodes_per_layer = 1
-extra_connection_chance = 0.0
+layer_count = 13
+minimum_nodes_per_layer = 2
+maximum_nodes_per_layer = 4
+extra_connection_chance = 0.28
 start_node = SubResource("Node_start")
 boss_node = SubResource("Node_boss")
-node_pool = [SubResource("Entry_battle"), SubResource("Entry_shop"), SubResource("Entry_event"), SubResource("Entry_camp"), SubResource("Entry_chest"), SubResource("Entry_elite")]
+node_pool = [SubResource("Entry_battle"), SubResource("Entry_patrol"), SubResource("Entry_shop"), SubResource("Entry_event"), SubResource("Entry_camp"), SubResource("Entry_chest"), SubResource("Entry_elite")]

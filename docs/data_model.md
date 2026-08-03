@@ -78,6 +78,7 @@ state and no direct behavior.
 
 | Field | Type | Responsibility |
 | --- | --- | --- |
+| `portrait` | `Texture2D` | Optional static Hero portrait used by presentation read models |
 | `starting_units` | `Array[UnitDefinition]` | Unit configurations used to initialize Run team state |
 | `starting_relics` | `Array[RelicDefinition]` | Relics copied into initial Run ownership |
 | `exclusive_relics` | `Array[RelicDefinition]` | Hero-specific Relic pool entries |

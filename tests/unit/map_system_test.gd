@@ -4,6 +4,7 @@ extends RefCounted
 
 static func run(suite: TestSuite) -> void:
 	_test_definition_and_deterministic_generation(suite)
+	_test_sparse_route_connections(suite)
 	_test_map_facts_and_read_views(suite)
 	_test_encounter_building(suite)
 	_test_event_operations_and_conditions(suite)
@@ -152,6 +153,124 @@ static func _test_definition_and_deterministic_generation(
 		all_required_placements_succeeded,
 		"Required nodes should use deterministic matching instead of greedy placement."
 	)
+
+
+static func _test_sparse_route_connections(suite: TestSuite) -> void:
+	var definition: MapDefinition = MapTestFactory.create_map(
+		MapTestFactory.create_event_node(false),
+		6,
+		2,
+		4
+	)
+	definition.extra_connection_chance = 1.0
+	var all_routes_are_sparse: bool = true
+	var all_routes_avoid_crossings: bool = true
+	var regular_nodes_have_limited_choices: bool = true
+	for seed: int in range(30):
+		var generated: MapGenerationResult = MapGenerationService.new().generate(
+			MapGenerationRequest.create(definition, seed, 0)
+		)
+		if not generated.succeeded():
+			all_routes_are_sparse = false
+			all_routes_avoid_crossings = false
+			regular_nodes_have_limited_choices = false
+			break
+		var state: MapState = generated.map_state
+		for layer_index: int in range(definition.layer_count + 1):
+			var sources: Array[MapNodeState] = _nodes_at_layer(
+				state,
+				layer_index
+			)
+			var targets: Array[MapNodeState] = _nodes_at_layer(
+				state,
+				layer_index + 1
+			)
+			var edges: Array[MapConnection] = _connections_between_layers(
+				state,
+				layer_index
+			)
+			if sources.size() > 1 and targets.size() > 1:
+				all_routes_are_sparse = (
+					all_routes_are_sparse
+					and edges.size() <= sources.size() + targets.size() - 1
+					and edges.size() < sources.size() * targets.size()
+				)
+			if _connections_cross(state, edges):
+				all_routes_avoid_crossings = false
+			if layer_index > 0 and targets.size() > 1:
+				for source: MapNodeState in sources:
+					var outgoing_count: int = 0
+					for edge: MapConnection in edges:
+						if edge.from_node_id == source.instance_id:
+							outgoing_count += 1
+					if outgoing_count > 2:
+						regular_nodes_have_limited_choices = false
+	suite.assert_true(
+		all_routes_are_sparse,
+		"Adjacent multi-node layers should not become fully connected."
+	)
+	suite.assert_true(
+		all_routes_avoid_crossings,
+		"Ordered route connections should not cross between adjacent layers."
+	)
+	suite.assert_true(
+		regular_nodes_have_limited_choices,
+		"Regular route nodes should expose at most two onward choices."
+	)
+
+
+static func _nodes_at_layer(
+	state: MapState,
+	layer_index: int
+) -> Array[MapNodeState]:
+	var result: Array[MapNodeState] = []
+	for node: MapNodeState in state.get_nodes():
+		if node.layer_index == layer_index:
+			result.append(node)
+	result.sort_custom(
+		func(left: MapNodeState, right: MapNodeState) -> bool:
+			return left.column_index < right.column_index
+	)
+	return result
+
+
+static func _connections_between_layers(
+	state: MapState,
+	layer_index: int
+) -> Array[MapConnection]:
+	var result: Array[MapConnection] = []
+	for connection: MapConnection in state.get_connections():
+		var source: MapNodeState = state.get_node(connection.from_node_id)
+		if source != null and source.layer_index == layer_index:
+			result.append(connection)
+	return result
+
+
+static func _connections_cross(
+	state: MapState,
+	connections: Array[MapConnection]
+) -> bool:
+	for first_index: int in range(connections.size()):
+		var first_source: MapNodeState = state.get_node(
+			connections[first_index].from_node_id
+		)
+		var first_target: MapNodeState = state.get_node(
+			connections[first_index].to_node_id
+		)
+		for second_index: int in range(first_index + 1, connections.size()):
+			var second_source: MapNodeState = state.get_node(
+				connections[second_index].from_node_id
+			)
+			var second_target: MapNodeState = state.get_node(
+				connections[second_index].to_node_id
+			)
+			if (
+				(first_source.column_index - second_source.column_index)
+				* (first_target.column_index - second_target.column_index)
+				< 0
+			):
+				return true
+	return false
 
 
 static func _test_map_facts_and_read_views(suite: TestSuite) -> void:

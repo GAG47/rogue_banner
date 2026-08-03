@@ -2,6 +2,7 @@ class_name RunSummaryReadModel
 extends RefCounted
 
 var hero_name: String = ""
+var hero_portrait: Texture2D
 var phase: GameEnums.RunPhase = GameEnums.RunPhase.READY
 var end_reason: GameEnums.RunEndReason = GameEnums.RunEndReason.NONE
 var gold: int = 0

@@ -34,6 +34,7 @@ func _build_summary(run: RunState) -> RunSummaryReadModel:
 	var model: RunSummaryReadModel = RunSummaryReadModel.new()
 	var hero: HeroDefinition = run.get_hero_definition()
 	model.hero_name = hero.display_name if hero != null else ""
+	model.hero_portrait = hero.portrait if hero != null else null
 	model.phase = run.get_phase()
 	model.end_reason = run.get_end_reason()
 	model.gold = run.get_gold()

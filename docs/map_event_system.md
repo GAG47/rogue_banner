@@ -86,9 +86,13 @@ then fills remaining Cells by weighted selection. Connections always point to
 the next layer.
 
 Every source receives an outgoing edge and every target receives an incoming
-edge. The generated graph therefore has a route from start through each layer
-to the Boss. Generated node instance IDs, concrete Definitions, and connections
-are saved; opening a Map view never samples content again.
+edge. Ordered projection creates a non-crossing backbone between adjacent
+layers. Optional seeded branches are capped to a sparse edge budget, preserve
+column order, and normally give a regular node no more than two outgoing
+choices. Multi-node layers therefore do not become fully connected. The graph
+still guarantees a route from start through each layer to the Boss. Generated
+node instance IDs, concrete Definitions, and connections are saved; opening a
+Map view never samples content again.
 
 ## Runtime Facts and Read Model
 

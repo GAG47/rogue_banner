@@ -242,9 +242,15 @@ func _connect_layers(
 ) -> bool:
 	if sources.is_empty() or targets.is_empty():
 		return false
-	var offset: int = random.next_int(0, targets.size() - 1)
+
+	# Project ordered nodes onto the adjacent layer in both directions. The
+	# resulting backbone gives every node an edge without crossing another path.
 	for source_index: int in range(sources.size()):
-		var target_index: int = (source_index + offset) % targets.size()
+		var target_index: int = _project_index(
+				source_index,
+				sources.size(),
+				targets.size()
+		)
 		if not _add_connection_if_missing(
 				state,
 				sources[source_index],
@@ -253,9 +259,11 @@ func _connect_layers(
 			return false
 
 	for target_index: int in range(targets.size()):
-		if _has_incoming(state, targets[target_index], sources):
-			continue
-		var source_index: int = (target_index + offset) % sources.size()
+		var source_index: int = _project_index(
+				target_index,
+				targets.size(),
+				sources.size()
+		)
 		if not _add_connection_if_missing(
 				state,
 				sources[source_index],
@@ -263,26 +271,155 @@ func _connect_layers(
 		):
 			return false
 
-	if targets.size() > 1:
-		for source_index: int in range(sources.size()):
-			if random.next_float() > extra_chance:
-				continue
-			var target_index: int = (
-					source_index + offset + 1
-			) % targets.size()
-			_add_connection_if_missing(
+	var maximum_edge_count: int = sources.size() + targets.size() - 1
+	for source_index: int in range(sources.size()):
+		if (
+			_count_layer_connections(state, sources, targets)
+			>= maximum_edge_count
+			or _count_outgoing_to_layer(
 					state,
 					sources[source_index],
-					targets[target_index]
+					targets
+			) >= 2
+			or random.next_float() > extra_chance
+		):
+			continue
+		var projected_target: int = _project_index(
+				source_index,
+				sources.size(),
+				targets.size()
+		)
+		var search_right_first: bool = random.next_int(0, 1) == 1
+		for distance: int in range(1, targets.size()):
+			var first_target: int = (
+					projected_target + distance
+					if search_right_first
+					else projected_target - distance
 			)
+			var second_target: int = (
+					projected_target - distance
+					if search_right_first
+					else projected_target + distance
+			)
+			if _try_add_sparse_connection(
+					state,
+					sources,
+					targets,
+					source_index,
+					first_target
+			):
+				break
+			if _try_add_sparse_connection(
+					state,
+					sources,
+					targets,
+					source_index,
+					second_target
+			):
+				break
 	return true
 
 
-func _has_incoming(state: MapState, target_id: int, sources: Array) -> bool:
+func _project_index(index: int, source_count: int, target_count: int) -> int:
+	if source_count <= 1 or target_count <= 1:
+		return 0
+	return roundi(
+		float(index)
+		* float(target_count - 1)
+		/ float(source_count - 1)
+	)
+
+
+func _try_add_sparse_connection(
+	state: MapState,
+	sources: Array,
+	targets: Array,
+	source_index: int,
+	target_index: int
+) -> bool:
+	if (
+		target_index < 0
+		or target_index >= targets.size()
+		or _connection_exists(
+				state,
+				sources[source_index],
+				targets[target_index]
+		)
+		or _would_cross_layer_connection(
+				state,
+				sources,
+				targets,
+				source_index,
+				target_index
+		)
+	):
+		return false
+	return state._add_connection(MapConnection.create(
+		sources[source_index],
+		targets[target_index]
+	))
+
+
+func _would_cross_layer_connection(
+	state: MapState,
+	sources: Array,
+	targets: Array,
+	source_index: int,
+	target_index: int
+) -> bool:
+	for connection: MapConnection in state._get_connections_mutable():
+		var other_source_index: int = sources.find(connection.from_node_id)
+		var other_target_index: int = targets.find(connection.to_node_id)
+		if other_source_index < 0 or other_target_index < 0:
+			continue
+		if (
+			(source_index - other_source_index)
+			* (target_index - other_target_index)
+			< 0
+		):
+			return true
+	return false
+
+
+func _count_outgoing_to_layer(
+	state: MapState,
+	source_id: int,
+	targets: Array
+) -> int:
+	var count: int = 0
 	for connection: MapConnection in state._get_connections_mutable():
 		if (
-			connection.to_node_id == target_id
-			and sources.has(connection.from_node_id)
+			connection.from_node_id == source_id
+			and targets.has(connection.to_node_id)
+		):
+			count += 1
+	return count
+
+
+func _count_layer_connections(
+	state: MapState,
+	sources: Array,
+	targets: Array
+) -> int:
+	var count: int = 0
+	for connection: MapConnection in state._get_connections_mutable():
+		if (
+			sources.has(connection.from_node_id)
+			and targets.has(connection.to_node_id)
+		):
+			count += 1
+	return count
+
+
+func _connection_exists(
+	state: MapState,
+	from_node_id: int,
+	to_node_id: int
+) -> bool:
+	for connection: MapConnection in state._get_connections_mutable():
+		if (
+			connection.from_node_id == from_node_id
+			and connection.to_node_id == to_node_id
 		):
 			return true
 	return false
