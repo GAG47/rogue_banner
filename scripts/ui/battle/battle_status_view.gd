@@ -1,84 +1,65 @@
 class_name BattleScreenStatusView
-extends VBoxContainer
+extends Control
 
 signal deployment_start_requested
 signal deployment_reset_requested
 signal art_selected(slot_index: int)
 signal art_use_requested
-signal scroll_selected(stack_instance_id: int)
-signal scroll_use_requested
 signal end_turn_requested
-signal battle_restart_requested
 
 @export var deployment_panel: Control
 @export var deployment_progress_label: Label
 @export var deployment_next_unit_label: Label
 @export var start_battle_button: Button
 @export var reset_deployment_button: Button
-@export var battle_panel: Control
-@export var selected_unit_label: Label
-@export var status_effects_label: Label
-@export var art_selector: OptionButton
+@export var unit_hud: Control
+@export var unit_portrait: TextureRect
+@export var unit_name_label: Label
+@export var health_bar: ProgressBar
+@export var status_bar: HBoxContainer
+@export var art_list: HBoxContainer
+@export var ap_label: Label
 @export var art_detail_label: Label
-@export var use_art_button: Button
-@export var intent_label: Label
-@export var relic_label: Label
-@export var scroll_selector: OptionButton
-@export var scroll_detail_label: Label
-@export var use_scroll_button: Button
+@export var turn_control: Control
 @export var end_turn_button: Button
-@export var restart_battle_button: Button
 
 var _listed_art_slots: Array[int] = []
-var _listed_scroll_ids: Array[int] = []
+var _art_buttons: Dictionary[int, Button] = {}
+var _listed_unit_id: int = 0
 
 
-func set_restart_available(available: bool) -> void:
-	restart_battle_button.visible = available
+func get_art_button_count() -> int:
+	return _art_buttons.size()
 
 
 func _ready() -> void:
-	if not start_battle_button.pressed.is_connected(_on_start_battle_pressed):
-		start_battle_button.pressed.connect(_on_start_battle_pressed)
-	if not reset_deployment_button.pressed.is_connected(
-		_on_reset_deployment_pressed
-	):
-		reset_deployment_button.pressed.connect(
-			_on_reset_deployment_pressed
-		)
-	if not art_selector.item_selected.is_connected(_on_art_item_selected):
-		art_selector.item_selected.connect(_on_art_item_selected)
-	if not use_art_button.pressed.is_connected(_on_use_art_pressed):
-		use_art_button.pressed.connect(_on_use_art_pressed)
-	if not scroll_selector.item_selected.is_connected(_on_scroll_item_selected):
-		scroll_selector.item_selected.connect(_on_scroll_item_selected)
-	if not use_scroll_button.pressed.is_connected(_on_use_scroll_pressed):
-		use_scroll_button.pressed.connect(_on_use_scroll_pressed)
-	if not end_turn_button.pressed.is_connected(_on_end_turn_pressed):
-		end_turn_button.pressed.connect(_on_end_turn_pressed)
-	if not restart_battle_button.pressed.is_connected(
-		_on_restart_battle_pressed
-	):
-		restart_battle_button.pressed.connect(_on_restart_battle_pressed)
+	start_battle_button.pressed.connect(
+		func() -> void: deployment_start_requested.emit()
+	)
+	reset_deployment_button.pressed.connect(
+		func() -> void: deployment_reset_requested.emit()
+	)
+	end_turn_button.pressed.connect(func() -> void: end_turn_requested.emit())
 
 
 func present(
-		model: BattleReadModel,
-		selected_unit_id: int,
-		selected_art_slot_index: int,
-		pending_art_slot_index: int,
-		selected_scroll_stack_id: int,
-		pending_scroll_stack_id: int,
-		deployed_count: int,
-		deployment_total: int,
-		next_deployment_name: String
+	model: BattleReadModel,
+	selected_unit_id: int,
+	selected_art_slot_index: int,
+	pending_art_slot_index: int,
+	deployed_count: int,
+	deployment_total: int,
+	next_deployment_name: String
 ) -> int:
 	var in_setup: bool = (
 		model != null and model.phase == GameEnums.BattlePhase.SETUP
 	)
 	deployment_panel.visible = in_setup
-	battle_panel.visible = not in_setup
+	turn_control.visible = (
+		model != null and not in_setup and not model.is_terminal()
+	)
 	if in_setup:
+		unit_hud.visible = false
 		_present_deployment(
 			deployed_count,
 			deployment_total,
@@ -89,26 +70,23 @@ func present(
 		model,
 		selected_unit_id,
 		selected_art_slot_index,
-		pending_art_slot_index,
-		selected_scroll_stack_id,
-		pending_scroll_stack_id
+		pending_art_slot_index
 	)
 
 
 func _present_deployment(
-		deployed_count: int,
-		deployment_total: int,
-		next_deployment_name: String
+	deployed_count: int,
+	deployment_total: int,
+	next_deployment_name: String
 ) -> void:
-	deployment_progress_label.text = "部署进度：%d / %d" % [
+	deployment_progress_label.text = "已部署  %d/%d" % [
 		deployed_count,
 		deployment_total,
 	]
 	deployment_next_unit_label.text = (
-		"下一名单位：%s\n点击蓝色部署格放置单位。"
-		% next_deployment_name
+		"下一名：%s" % next_deployment_name
 		if deployed_count < deployment_total
-		else "所有单位已经部署，可以开始战斗。"
+		else "部署完成，可以开始战斗"
 	)
 	start_battle_button.disabled = (
 		deployment_total <= 0 or deployed_count != deployment_total
@@ -116,190 +94,210 @@ func _present_deployment(
 
 
 func _present_battle(
-		model: BattleReadModel,
-		selected_unit_id: int,
-		selected_art_slot_index: int,
-		pending_art_slot_index: int,
-		selected_scroll_stack_id: int,
-		pending_scroll_stack_id: int
-) -> int:
-	if model == null:
-		_present_unavailable()
-		return -1
-	var selected_unit: BattleUnitReadModel = model.get_unit(selected_unit_id)
-	_present_selected_unit(selected_unit)
-	var resolved_slot: int = _rebuild_art_options(
-		selected_unit,
-		selected_art_slot_index
-	)
-	_present_art(
-		model,
-		selected_unit,
-		resolved_slot,
-		pending_art_slot_index
-	)
-	_present_intents(model)
-	_present_run_items(
-		model,
-		selected_unit,
-		selected_scroll_stack_id,
-		pending_scroll_stack_id
-	)
-	end_turn_button.disabled = (
-		model.phase != GameEnums.BattlePhase.PLAYER_TURN
-		or model.active_side != GameEnums.BattleSide.PLAYER
-	)
-	return resolved_slot
-
-
-func _present_run_items(
 	model: BattleReadModel,
-	selected_unit: BattleUnitReadModel,
-	selected_scroll_stack_id: int,
-	pending_scroll_stack_id: int
-) -> void:
-	var relic_names: Array[String] = []
-	for relic: BattleRelicReadModel in model.relics:
-		relic_names.append(relic.display_name)
-	relic_label.text = "遗物：%s" % (
-		"、".join(relic_names) if not relic_names.is_empty() else "无"
-	)
-	_listed_scroll_ids.clear()
-	scroll_selector.set_block_signals(true)
-	scroll_selector.clear()
-	var selected_item: int = -1
-	for scroll: BattleScrollReadModel in model.scrolls:
-		scroll_selector.add_item("%s × %d" % [
-			scroll.display_name,
-			scroll.quantity,
-		])
-		_listed_scroll_ids.append(scroll.stack_instance_id)
-		if scroll.stack_instance_id == selected_scroll_stack_id:
-			selected_item = _listed_scroll_ids.size() - 1
-	if selected_item < 0 and not _listed_scroll_ids.is_empty():
-		selected_item = 0
-	if selected_item >= 0:
-		scroll_selector.select(selected_item)
-	scroll_selector.disabled = _listed_scroll_ids.is_empty()
-	scroll_selector.set_block_signals(false)
-	var selected_scroll: BattleScrollReadModel
-	if selected_item >= 0:
-		selected_scroll = model.scrolls[selected_item]
-	if selected_scroll == null:
-		scroll_detail_label.text = "卷轴：无"
-		use_scroll_button.disabled = true
-		return
-	scroll_detail_label.text = "%s · 数量%d · 射程%d—%d" % [
-		selected_scroll.display_name,
-		selected_scroll.quantity,
-		selected_scroll.minimum_range,
-		selected_scroll.maximum_range,
-	]
-	use_scroll_button.text = (
-		"取消卷轴目标选择" if pending_scroll_stack_id > 0 else "使用卷轴"
-	)
-	use_scroll_button.disabled = (
-		selected_unit == null
-		or selected_unit.side != GameEnums.BattleSide.PLAYER
-		or selected_scroll.quantity <= 0
+	selected_unit_id: int,
+	selected_art_slot_index: int,
+	pending_art_slot_index: int
+) -> int:
+	end_turn_button.disabled = (
+		model == null
 		or model.phase != GameEnums.BattlePhase.PLAYER_TURN
 		or model.active_side != GameEnums.BattleSide.PLAYER
 	)
+	if model == null:
+		_hide_unit_hud()
+		return -1
+	var selected_unit: BattleUnitReadModel = model.get_unit(selected_unit_id)
+	if (
+		selected_unit == null
+		or selected_unit.side != GameEnums.BattleSide.PLAYER
+	):
+		_hide_unit_hud()
+		return -1
+	unit_hud.visible = true
+	_present_selected_unit(selected_unit)
+	var resolved_slot: int = _resolve_art_slot(
+		selected_unit,
+		selected_art_slot_index
+	)
+	var can_submit_action: bool = (
+		model.phase == GameEnums.BattlePhase.PLAYER_TURN
+		and model.active_side == GameEnums.BattleSide.PLAYER
+	)
+	_present_art_buttons(selected_unit, resolved_slot, can_submit_action)
+	_present_art(selected_unit, resolved_slot, pending_art_slot_index)
+	return resolved_slot
+
+
+func _hide_unit_hud() -> void:
+	unit_hud.visible = false
+	_rebuild_art_buttons(null)
+	_clear_children(status_bar)
 
 
 func _present_selected_unit(unit: BattleUnitReadModel) -> void:
-	if unit == null:
-		selected_unit_label.text = "当前单位\n未选择"
-		status_effects_label.text = "状态与被动\n未选择单位"
-		return
-	selected_unit_label.text = (
-		"%s · 编号%d\n生命：%d / %d　护盾：%d\n"
-		+ "行动点：%d / %d　位置：%d,%d"
-	) % [
-		unit.display_name,
-		unit.instance_id,
+	unit_name_label.text = unit.display_name
+	unit_portrait.tooltip_text = unit.display_name
+	health_bar.max_value = maxf(1.0, float(unit.maximum_health))
+	health_bar.value = float(unit.current_health)
+	health_bar.tooltip_text = "生命：%d/%d" % [
 		unit.current_health,
 		unit.maximum_health,
-		unit.current_shield,
-		unit.current_ap,
-		unit.maximum_ap,
-		unit.coordinate.x,
-		unit.coordinate.y,
 	]
-	var status_lines: Array[String] = ["状态与被动"]
-	var has_status: bool = false
+	ap_label.text = "行动点  %d/%d" % [unit.current_ap, unit.maximum_ap]
+	_present_status_slots(unit)
+
+
+func _present_status_slots(unit: BattleUnitReadModel) -> void:
+	_clear_children(status_bar)
+	if unit.current_shield > 0:
+		_add_status_slot("盾%d" % unit.current_shield, "当前护盾")
 	for buff: BattleBuffReadModel in unit.buffs:
-		status_lines.append(
-			"增益：%s · %d层 · 剩余%d回合" % [
-				buff.display_name,
-				buff.stacks,
-				buff.remaining_turns,
-			]
+		_add_status_slot(
+			"%s×%d" % [buff.display_name.left(2), buff.stacks],
+			"%s，%d层" % [buff.display_name, buff.stacks]
 		)
-		has_status = true
 	for art: BattleArtReadModel in unit.arts:
 		if art.is_passive():
-			status_lines.append("被动：%s" % art.display_name)
-			has_status = true
-	if not has_status:
-		status_lines.append("无")
-	status_effects_label.text = "\n".join(status_lines)
+			_add_status_slot(art.display_name.left(2), "被动：%s" % art.display_name)
 
 
-func _rebuild_art_options(
-		unit: BattleUnitReadModel,
-		preferred_slot: int
+func _add_status_slot(text: String, tooltip: String) -> void:
+	var slot: Label = Label.new()
+	slot.custom_minimum_size = Vector2(40.0, 28.0)
+	slot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	slot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	slot.text = text
+	slot.tooltip_text = tooltip
+	slot.add_theme_font_size_override("font_size", 11)
+	slot.add_theme_color_override("font_color", Color("c8e7ef"))
+	slot.add_theme_stylebox_override("normal", _status_style())
+	status_bar.add_child(slot)
+
+
+func _resolve_art_slot(
+	unit: BattleUnitReadModel,
+	preferred_slot: int
 ) -> int:
-	_listed_art_slots.clear()
-	art_selector.set_block_signals(true)
-	art_selector.clear()
-	if unit == null:
-		art_selector.disabled = true
-		art_selector.set_block_signals(false)
+	if unit == null or unit.arts.is_empty():
 		return -1
-	var selected_item: int = -1
-	var first_active_item: int = -1
 	for art: BattleArtReadModel in unit.arts:
-		var label: String = "%d　%s" % [
-			art.slot_index + 1,
-			art.display_name,
-		]
-		if art.is_passive():
-			label += "（被动）"
-		elif art.current_cooldown > 0:
-			label += "（冷却%d）" % art.current_cooldown
-		art_selector.add_item(label)
-		_listed_art_slots.append(art.slot_index)
-		var item_index: int = _listed_art_slots.size() - 1
-		art_selector.set_item_metadata(item_index, art.slot_index)
 		if art.slot_index == preferred_slot:
-			selected_item = item_index
-		if first_active_item < 0 and not art.is_passive():
-			first_active_item = item_index
-	if _listed_art_slots.is_empty():
-		art_selector.disabled = true
-		art_selector.set_block_signals(false)
-		return -1
-	if selected_item < 0:
-		selected_item = first_active_item if first_active_item >= 0 else 0
-	art_selector.select(selected_item)
-	art_selector.disabled = false
-	art_selector.set_block_signals(false)
-	return _listed_art_slots[selected_item]
+			return preferred_slot
+	for art: BattleArtReadModel in unit.arts:
+		if not art.is_passive():
+			return art.slot_index
+	return unit.arts[0].slot_index
+
+
+func _present_art_buttons(
+	unit: BattleUnitReadModel,
+	selected_slot: int,
+	can_submit_action: bool
+) -> void:
+	var unit_id: int = unit.instance_id if unit != null else 0
+	var slots: Array[int] = []
+	if unit != null:
+		for art: BattleArtReadModel in unit.arts:
+			slots.append(art.slot_index)
+	if unit_id != _listed_unit_id or slots != _listed_art_slots:
+		_rebuild_art_buttons(unit)
+	if unit == null:
+		return
+	for art: BattleArtReadModel in unit.arts:
+		var button: Button = _art_buttons.get(art.slot_index) as Button
+		if button == null:
+			continue
+		button.text = _art_button_text(art)
+		button.tooltip_text = _art_tooltip(art)
+		button.disabled = (
+			not can_submit_action
+			or art.is_passive()
+			or art.current_cooldown > 0
+			or unit.current_ap < art.ap_cost
+		)
+		_apply_art_button_style(button, art, art.slot_index == selected_slot)
+
+
+func _rebuild_art_buttons(unit: BattleUnitReadModel) -> void:
+	_clear_children(art_list)
+	_art_buttons.clear()
+	_listed_art_slots.clear()
+	_listed_unit_id = unit.instance_id if unit != null else 0
+	if unit == null:
+		return
+	for art: BattleArtReadModel in unit.arts:
+		var button: Button = Button.new()
+		button.custom_minimum_size = Vector2(132.0, 58.0)
+		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.pressed.connect(_on_art_button_pressed.bind(art.slot_index))
+		art_list.add_child(button)
+		_art_buttons[art.slot_index] = button
+		_listed_art_slots.append(art.slot_index)
+
+
+func _art_button_text(art: BattleArtReadModel) -> String:
+	if art.is_passive():
+		return "%s\n被动" % art.display_name
+	var state: String = (
+		"冷却%d" % art.current_cooldown
+		if art.current_cooldown > 0
+		else "AP %d" % art.ap_cost
+	)
+	return "%s\n%s" % [art.display_name, state]
+
+
+func _art_tooltip(art: BattleArtReadModel) -> String:
+	return "%s\n射程：%d—%d　基础冷却：%d" % [
+		art.display_name,
+		art.minimum_range,
+		art.maximum_range,
+		art.base_cooldown,
+	]
+
+
+func _apply_art_button_style(
+	button: Button,
+	art: BattleArtReadModel,
+	selected: bool
+) -> void:
+	var border: Color = Color("40515d")
+	var fill: Color = Color("14212a")
+	var text_color: Color = Color("cdd9df")
+	if selected:
+		border = Color("43cabb")
+		fill = Color("18333a")
+		text_color = Color("efffff")
+	elif art.current_cooldown > 0 or art.is_passive():
+		text_color = Color("7d8c95")
+	button.add_theme_stylebox_override(
+		"normal",
+		_art_style(fill, border, 2 if selected else 1)
+	)
+	button.add_theme_stylebox_override(
+		"hover",
+		_art_style(fill.lightened(0.08), border.lightened(0.1), 2)
+	)
+	button.add_theme_stylebox_override(
+		"pressed",
+		_art_style(fill.darkened(0.08), border, 2)
+	)
+	button.add_theme_color_override("font_color", text_color)
+	button.add_theme_color_override(
+		"font_hover_color",
+		text_color.lightened(0.08)
+	)
 
 
 func _present_art(
-		model: BattleReadModel,
-		unit: BattleUnitReadModel,
-		selected_slot: int,
-		pending_slot: int
+	unit: BattleUnitReadModel,
+	selected_slot: int,
+	pending_slot: int
 ) -> void:
-	var art: BattleArtReadModel
-	if unit != null:
-		art = unit.get_art(selected_slot)
+	var art: BattleArtReadModel = unit.get_art(selected_slot)
 	if art == null:
-		art_detail_label.text = "技艺：未选择"
-		use_art_button.disabled = true
+		art_detail_label.text = "没有可用技艺"
 		return
 	var status: String = "可用"
 	if art.is_passive():
@@ -308,117 +306,44 @@ func _present_art(
 		status = "冷却%d回合" % art.current_cooldown
 	elif unit.current_ap < art.ap_cost:
 		status = "行动点不足"
-	art_detail_label.text = (
-		"%s · %s\n消耗：%d　基础冷却：%d　状态：%s\n"
-		+ "目标：%s　射程：%d—%d"
-	) % [
-		art.display_name,
+	elif pending_slot == selected_slot:
+		status = "选择目标中，右键取消"
+	art_detail_label.text = "%s · %s · 射程%d—%d" % [
 		BattleUiTextFormatter.art_category_text(art.category),
-		art.ap_cost,
-		art.base_cooldown,
 		status,
-		BattleUiTextFormatter.target_kind_text(art.target_kind),
 		art.minimum_range,
 		art.maximum_range,
 	]
-	use_art_button.text = (
-		"取消目标选择" if pending_slot >= 0 else "选择技艺目标"
-	)
-	use_art_button.disabled = (
-		unit.side != GameEnums.BattleSide.PLAYER
-		or
-		art.is_passive()
-		or art.current_cooldown > 0
-		or unit.current_ap < art.ap_cost
-		or model.phase != GameEnums.BattlePhase.PLAYER_TURN
-		or model.active_side != GameEnums.BattleSide.PLAYER
-	)
 
 
-func _present_intents(model: BattleReadModel) -> void:
-	var lines: Array[String] = []
-	if model.intents.is_empty():
-		lines.append("当前没有敌人意图。")
-	for intent: BattleIntentReadModel in model.intents:
-		var line: String = "%s · %s · %s" % [
-			intent.actor_name,
-			BattleUiTextFormatter.intent_kind_text(intent.kind),
-			intent.intent_name,
-		]
-		if intent.has_move_destination:
-			line += "\n  移动终点：%d,%d" % [
-				intent.move_destination.x,
-				intent.move_destination.y,
-			]
-		if not intent.locked_unit_ids.is_empty():
-			var target: BattleUnitReadModel = model.get_unit(
-				intent.locked_unit_ids[0]
-			)
-			line += "\n  锁定单位：%s" % (
-				target.display_name if target != null else "已离场单位"
-			)
-		elif not intent.locked_cells.is_empty():
-			line += "\n  锁定格子：%d,%d" % [
-				intent.locked_cells[0].x,
-				intent.locked_cells[0].y,
-			]
-		line += "\n  当前影响：%d格%s" % [
-			intent.affected_cells.size(),
-			"" if intent.currently_valid else "（可能落空）",
-		]
-		lines.append(line)
-	intent_label.text = "\n\n".join(lines)
-
-
-func _present_unavailable() -> void:
-	selected_unit_label.text = "当前单位\n不可用"
-	status_effects_label.text = "状态与被动\n不可用"
-	art_selector.clear()
-	art_selector.disabled = true
-	art_detail_label.text = "技艺：不可用"
-	intent_label.text = "意图：不可用"
-	use_art_button.disabled = true
-	scroll_selector.clear()
-	scroll_selector.disabled = true
-	scroll_detail_label.text = "卷轴：不可用"
-	relic_label.text = "遗物：不可用"
-	use_scroll_button.disabled = true
-	end_turn_button.disabled = true
-
-
-func _on_start_battle_pressed() -> void:
-	deployment_start_requested.emit()
-
-
-func _on_reset_deployment_pressed() -> void:
-	deployment_reset_requested.emit()
-
-
-func _on_art_item_selected(item_index: int) -> void:
-	if item_index < 0 or item_index >= _listed_art_slots.size():
-		art_selected.emit(-1)
-		return
-	art_selected.emit(_listed_art_slots[item_index])
-
-
-func _on_use_art_pressed() -> void:
+func _on_art_button_pressed(slot_index: int) -> void:
+	art_selected.emit(slot_index)
 	art_use_requested.emit()
 
 
-func _on_scroll_item_selected(item_index: int) -> void:
-	if item_index < 0 or item_index >= _listed_scroll_ids.size():
-		scroll_selected.emit(0)
-		return
-	scroll_selected.emit(_listed_scroll_ids[item_index])
+func _art_style(
+	fill: Color,
+	border: Color,
+	border_width: int
+) -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(6)
+	return style
 
 
-func _on_use_scroll_pressed() -> void:
-	scroll_use_requested.emit()
+func _status_style() -> StyleBoxFlat:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color("172630")
+	style.border_color = Color("3d5e69")
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	return style
 
 
-func _on_end_turn_pressed() -> void:
-	end_turn_requested.emit()
-
-
-func _on_restart_battle_pressed() -> void:
-	battle_restart_requested.emit()
+func _clear_children(parent: Node) -> void:
+	for child: Node in parent.get_children():
+		parent.remove_child(child)
+		child.free()

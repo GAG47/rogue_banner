@@ -16,9 +16,6 @@ const RUN_SEED: int = 20260802
 @export var result_panel: RunResultView
 @export var inventory_overlay: InventoryOverlayView
 @export var settings_overlay: SettingsOverlayView
-@export var feedback_toast: Control
-@export var feedback_label: Label
-@export var feedback_timer: Timer
 
 @export_category("Starting Content")
 @export var hero_definition: HeroDefinition
@@ -39,7 +36,6 @@ func _ready() -> void:
 
 func start_new_run() -> bool:
 	if hero_definition == null or map_definition == null:
-		_show_feedback("v8 初始内容配置不完整。")
 		return false
 	var setup: RunSetup = RunSetup.create(
 		hero_definition,
@@ -57,7 +53,7 @@ func start_new_run() -> bool:
 	_map_overlay_open = false
 	inventory_overlay.visible = false
 	settings_overlay.visible = false
-	_present_result(result, "")
+	_present_result(result)
 	return result.succeeded
 
 
@@ -74,14 +70,12 @@ func _refresh() -> void:
 	if _snapshot == null:
 		return
 	var in_battle: bool = _snapshot.route == RunSessionRoute.Value.BATTLE
-	if in_battle:
-		_map_overlay_open = false
 	var map_visible: bool = (
 		_snapshot.route == RunSessionRoute.Value.MAP
 		or _map_overlay_open
 	)
-	shell_header.visible = not in_battle
-	shell_content.offset_top = 0.0 if in_battle else 64.0
+	shell_header.visible = true
+	shell_content.offset_top = 64.0
 	shell_content.offset_bottom = 0.0
 	header_view.present(
 		_snapshot.summary,
@@ -94,7 +88,7 @@ func _refresh() -> void:
 		not map_visible
 		and _snapshot.route == RunSessionRoute.Value.DEPLOYMENT
 	)
-	battle_host.visible = in_battle
+	battle_host.visible = in_battle and not map_visible
 	reward_panel.visible = not map_visible and _snapshot.route in [
 		RunSessionRoute.Value.REWARD,
 		RunSessionRoute.Value.SHOP,
@@ -121,11 +115,17 @@ func _refresh() -> void:
 		event_panel.present(_snapshot.event, _snapshot.inventory)
 	if result_panel.visible:
 		result_panel.present(_snapshot.summary)
-	if battle_host.visible:
+	if in_battle:
 		var battle: BattleState = _session.get_current_battle_for_host()
 		if battle != null and battle != _bound_battle:
 			_bound_battle = battle
 			battle_screen.present_external_battle(battle)
+		var battle_model: BattleReadModel = battle_screen.get_read_model()
+		if battle_model != null:
+			header_view.present_battle_scrolls(
+				battle_model.scrolls,
+				_snapshot.summary.scroll_capacity
+			)
 	else:
 		if _bound_battle != null:
 			battle_screen.clear_external_battle()
@@ -136,10 +136,17 @@ func _connect_interface() -> void:
 	header_view.map_requested.connect(_on_map_requested)
 	header_view.build_requested.connect(_on_build_requested)
 	header_view.settings_requested.connect(_on_settings_requested)
+	header_view.scroll_use_requested.connect(_on_header_scroll_use_requested)
+	header_view.scroll_discard_requested.connect(
+		_on_header_scroll_discard_requested
+	)
 	map_panel.node_requested.connect(_on_node_requested)
 	deployment_panel.battle_start_requested.connect(_on_battle_start_requested)
 	battle_screen.external_battle_continue_requested.connect(
 		_on_battle_continue_requested
+	)
+	battle_screen.battle_read_model_changed.connect(
+		_on_battle_read_model_changed
 	)
 	reward_panel.option_claim_requested.connect(_on_reward_claim_requested)
 	reward_panel.option_skip_requested.connect(_on_reward_skip_requested)
@@ -154,32 +161,59 @@ func _connect_interface() -> void:
 	settings_overlay.closed.connect(_on_settings_closed)
 	settings_overlay.abandon_requested.connect(_on_abandon_requested)
 	settings_overlay.tooltips_changed.connect(_on_tooltips_changed)
-	feedback_timer.timeout.connect(
-		func() -> void: feedback_toast.visible = false
-	)
 	result_panel.new_run_requested.connect(start_new_run)
 
 
 func _on_node_requested(node_instance_id: int) -> void:
-	_present_result(
-		_session.advance_to_node(node_instance_id),
-		"已进入节点。"
-	)
+	_present_result(_session.advance_to_node(node_instance_id))
 
 
 func _on_battle_start_requested(
 	deployments: Array[RunUnitDeployment]
 ) -> void:
-	_present_result(
-		_session.start_current_battle(deployments),
-		"战斗开始。敌人已经公布第一批意图。"
-	)
+	_present_result(_session.start_current_battle(deployments))
 
 
 func _on_battle_continue_requested() -> void:
-	_present_result(
-		_session.submit_current_battle_result(),
-		"战斗结果已经写回远征。"
+	_present_result(_session.submit_current_battle_result())
+
+
+func _on_header_scroll_use_requested(stack_instance_id: int) -> void:
+	if _snapshot == null or _snapshot.route != RunSessionRoute.Value.BATTLE:
+		return
+	battle_screen.request_use_scroll(stack_instance_id)
+
+
+func _on_header_scroll_discard_requested(stack_instance_id: int) -> void:
+	if _snapshot == null:
+		return
+	match _snapshot.route:
+		RunSessionRoute.Value.BATTLE:
+			battle_screen.request_discard_scroll(stack_instance_id)
+		RunSessionRoute.Value.MAP:
+			_present_result(
+				_session.execute_inventory_command(
+					ConsumeScrollCommand.create(stack_instance_id)
+				)
+			)
+		RunSessionRoute.Value.REWARD:
+			_present_result(
+				_session.discard_scroll_during_offer(stack_instance_id)
+			)
+		_:
+			return
+
+
+func _on_battle_read_model_changed(model: BattleReadModel) -> void:
+	if (
+		_snapshot == null
+		or _snapshot.route != RunSessionRoute.Value.BATTLE
+		or model == null
+	):
+		return
+	header_view.present_battle_scrolls(
+		model.scrolls,
+		_snapshot.summary.scroll_capacity
 	)
 
 
@@ -189,49 +223,36 @@ func _on_reward_claim_requested(
 	destination: RewardGrantDestination
 ) -> void:
 	_present_result(
-		_session.claim_offer_option(offer_id, option_id, destination),
-		"奖励已经领取。"
+		_session.claim_offer_option(offer_id, option_id, destination)
 	)
 
 
 func _on_reward_skip_requested(offer_id: int, option_id: int) -> void:
-	_present_result(
-		_session.skip_offer_option(offer_id, option_id),
-		"该项奖励已经放弃。"
-	)
+	_present_result(_session.skip_offer_option(offer_id, option_id))
 
 
 func _on_reward_finish_requested(offer_id: int) -> void:
-	_present_result(
-		_session.finish_offer(offer_id),
-		"奖励处理完成，节点已经结算。"
-	)
+	_present_result(_session.finish_offer(offer_id))
 
 
 func _on_reward_take_all_requested(offer_id: int) -> void:
-	_present_result(
-		_session.take_all_offer(offer_id),
-		"全部奖励已经领取。"
-	)
+	_present_result(_session.take_all_offer(offer_id))
 
 
 func _on_shop_close_requested(offer_id: int) -> void:
-	_present_result(_session.close_shop(offer_id), "已经离开商店。")
+	_present_result(_session.close_shop(offer_id))
 
 
 func _on_reward_scroll_discard_requested(stack_id: int) -> void:
-	_present_result(
-		_session.discard_scroll_during_offer(stack_id),
-		"已经丢弃一张卷轴。"
-	)
+	_present_result(_session.discard_scroll_during_offer(stack_id))
 
 
 func _on_event_choice_requested(choice_id: StringName) -> void:
-	_present_result(_session.choose_event(choice_id), "事件结果已经确定。")
+	_present_result(_session.choose_event(choice_id))
 
 
 func _on_event_execute_requested(request: MapEventResolveRequest) -> void:
-	_present_result(_session.execute_event(request), "事件已经结算。")
+	_present_result(_session.execute_event(request))
 
 
 func _on_map_requested() -> void:
@@ -243,6 +264,7 @@ func _on_map_requested() -> void:
 		return
 	if _snapshot.route in [
 		RunSessionRoute.Value.DEPLOYMENT,
+		RunSessionRoute.Value.BATTLE,
 		RunSessionRoute.Value.REWARD,
 		RunSessionRoute.Value.SHOP,
 		RunSessionRoute.Value.EVENT,
@@ -275,7 +297,7 @@ func _on_inventory_closed() -> void:
 
 func _on_inventory_command_requested(command: RunCommand) -> void:
 	var result: RunSessionResult = _session.execute_inventory_command(command)
-	_present_result(result, "队伍配置已经更新。")
+	_present_result(result)
 	if result.succeeded and _snapshot != null:
 		inventory_overlay.present(_snapshot.inventory, true)
 
@@ -291,18 +313,10 @@ func _on_tooltips_changed(enabled: bool) -> void:
 
 func _on_abandon_requested() -> void:
 	settings_overlay.visible = false
-	_present_result(_session.abandon_run(), "远征已经放弃。")
+	_present_result(_session.abandon_run())
 
 
-func _present_result(result: RunSessionResult, _success_message: String) -> void:
-	if result == null or not result.succeeded:
-		_show_feedback(RunUiTextFormatter.result_text(result))
-	else:
+func _present_result(result: RunSessionResult) -> void:
+	if result != null and result.succeeded:
 		_map_overlay_open = false
 	_refresh()
-
-
-func _show_feedback(message: String) -> void:
-	feedback_label.text = message
-	feedback_toast.visible = true
-	feedback_timer.start()

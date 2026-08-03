@@ -91,15 +91,6 @@ func _draw() -> void:
 		var cell_rect: Rect2 = _cell_rect(coordinate).grow(-4.0)
 		draw_rect(cell_rect, REACHABLE_COLOR, true)
 		draw_rect(cell_rect, REACHABLE_BORDER_COLOR, false, 2.0)
-		draw_string(
-			ThemeDB.fallback_font,
-			cell_rect.position + Vector2(7.0, cell_rect.size.y - 7.0),
-			"%d 行动点" % _reachable_cells[coordinate],
-			HORIZONTAL_ALIGNMENT_LEFT,
-			-1.0,
-			13,
-			REACHABLE_BORDER_COLOR
-		)
 	_draw_cells(
 		_art_range_cells,
 		ART_RANGE_COLOR,

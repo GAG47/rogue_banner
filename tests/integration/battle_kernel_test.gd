@@ -8,6 +8,7 @@ static func run(suite: TestSuite) -> void:
 	_test_invalid_actions_are_atomic(suite)
 	_test_turn_transitions_and_refresh(suite)
 	_test_use_art_entry_is_non_committing(suite)
+	_test_scroll_discard_action(suite)
 	_test_defeated_unit_cleanup(suite)
 
 
@@ -392,9 +393,68 @@ static func _test_use_art_entry_is_non_committing(suite: TestSuite) -> void:
 			"Failed Effect planning must not spend AP."
 	)
 	suite.assert_int_equal(
-			0,
-			player_state.arts[0].current_cooldown,
-			"Failed Effect planning must not start cooldown."
+		0,
+		player_state.arts[0].current_cooldown,
+		"Failed Effect planning must not start cooldown."
+	)
+
+
+static func _test_scroll_discard_action(suite: TestSuite) -> void:
+	var fixture: BattleKernelFixture = BattleKernelFixture.create()
+	fixture.placement_service.place_run_unit(
+		fixture.battle,
+		fixture.run_unit,
+		GameEnums.BattleSide.PLAYER,
+		Vector2i.ZERO
+	)
+	fixture.placement_service.place_unit_definition(
+		fixture.battle,
+		fixture.core.unit,
+		GameEnums.BattleSide.ENEMY,
+		Vector2i(2, 0)
+	)
+	var definition: ScrollDefinition = load(
+		"res://content/scrolls/debug_blast_scroll.tres"
+	) as ScrollDefinition
+	var stack: BattleScrollStackState = BattleScrollStackState.create(
+		31,
+		31,
+		definition,
+		2
+	)
+	suite.assert_true(
+		fixture.battle._register_scroll(stack),
+		"The discard fixture should register its Battle Scroll stack."
+	)
+	fixture.action_service.start_battle(fixture.battle)
+	var discarded: ActionExecutionResult = fixture.action_service.execute(
+		fixture.battle,
+		DiscardScrollActionRequest.create(stack.instance_id)
+	)
+	suite.assert_true(
+		discarded.is_successful
+		and discarded.scrolls_discarded == 1
+		and discarded.events.is_empty(),
+		"Discarding a Scroll should commit one quantity without emitting a Scroll-used event."
+	)
+	suite.assert_int_equal(
+		1,
+		fixture.battle.get_scroll(stack.instance_id).quantity,
+		"A valid Scroll discard should change only the transactional Battle stack."
+	)
+	var rejected: ActionExecutionResult = fixture.action_service.execute(
+		fixture.battle,
+		DiscardScrollActionRequest.create(999)
+	)
+	suite.assert_int_equal(
+		GameEnums.ActionFailureCode.SCROLL_NOT_FOUND,
+		rejected.failure_code,
+		"Discarding an unknown Scroll stack should be rejected."
+	)
+	suite.assert_int_equal(
+		1,
+		fixture.battle.get_scroll(stack.instance_id).quantity,
+		"A rejected Scroll discard must not change another stack."
 	)
 
 

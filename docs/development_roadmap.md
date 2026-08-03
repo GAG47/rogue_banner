@@ -268,6 +268,35 @@ compact Hero, Gold, Scroll-slot, Map, Build, and Settings bar; removes the
 permanent feedback footer; and changes Map nodes to clear compact icons with
 reachable outlines and hover enlargement.
 
+### v8.2 Deployment Presentation
+
+Implemented as the second v8 presentation pass. Deployment now shows the full
+Battlefield with clear terrain, enemy-spawn, and cyan deployable-Cell states.
+The debug unit selector, coordinate text, and assignment list are removed.
+Available Units are presented as compact cards in a bottom horizontal roster;
+undeployed, selected, and deployed cards have distinct visual states while
+remaining repositionable. The UI still stores only a deployment draft and
+submits typed `RunUnitDeployment` requests through the existing Map and Battle
+startup pipeline. Deployment and Battle now share one board scene; Battle keeps
+the persistent Run header, uses board-local Cell input, and presents Unit and
+Art controls only in a friendly-selection lower HUD. Round and end-turn controls
+remain at the lower right without a permanent side panel, coordinate labels,
+movement-cost text, or runtime diagnostic dumps. The board occupies the complete
+Battle surface and supports Space plus left-drag or middle-mouse presentation
+panning without changing authoritative Grid state.
+The same presentation pass now keeps Scroll use in the persistent header,
+enters targeting directly from Art buttons, supports right-click targeting
+cancellation, and removes the rectangular background and duplicate action
+controls from the selected-Unit HUD.
+Scroll details now appear in a custom card attached below the hovered header
+slot while a compact click menu owns Use and Discard. The lower HUD distributes
+Unit status, fixed-size centered Art slots, and turn controls
+across the available width, and the shared board supports presentation-only
+mouse-wheel zoom in addition to panning.
+Formal Run and Battle scenes no longer overlay generic success, instruction, or
+failure banners; state changes are presented through their owning controls and
+authoritative snapshots.
+
 ## Phase 9: Heroes and Meta Progression
 
 Complete:

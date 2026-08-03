@@ -12,6 +12,7 @@ var events: Array[BattleEvent] = []
 var removed_unit_ids: Array[int] = []
 var scroll_stack_instance_id: int = 0
 var scrolls_consumed: int = 0
+var scrolls_discarded: int = 0
 
 
 static func success(battle: BattleState) -> ActionExecutionResult:

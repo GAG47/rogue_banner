@@ -1,62 +1,71 @@
 [gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/battle/battle_screen_controller.gd" id="1_controller"]
-[ext_resource type="Script" path="res://scripts/ui/battle/battle_grid_view.gd" id="2_grid"]
-[ext_resource type="Script" path="res://scripts/ui/battle/battle_highlight_view.gd" id="3_highlight"]
-[ext_resource type="Script" path="res://scripts/ui/battle/battle_unit_view.gd" id="4_unit"]
-[ext_resource type="Script" path="res://scripts/ui/battle/battle_status_view.gd" id="5_status"]
-[ext_resource type="Resource" path="res://content/encounters/v7_tactical_encounter.tres" id="6_encounter"]
-[ext_resource type="Resource" path="res://content/units/debug_vanguard.tres" id="7_player"]
+[ext_resource type="Script" path="res://scripts/ui/battle/battle_status_view.gd" id="2_status"]
+[ext_resource type="PackedScene" path="res://scenes/battle/battle_board.tscn" id="3_board"]
+[ext_resource type="Resource" path="res://content/encounters/v7_tactical_encounter.tres" id="4_encounter"]
+[ext_resource type="Resource" path="res://content/units/debug_vanguard.tres" id="5_player"]
+[ext_resource type="Texture2D" path="res://icon.svg" id="6_portrait"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
-bg_color = Color(0.075, 0.102, 0.14, 0.97)
+[sub_resource type="StyleBoxFlat" id="Style_board"]
+bg_color = Color(0, 0, 0, 0)
+
+[sub_resource type="StyleBoxFlat" id="Style_hud"]
+bg_color = Color(0.035, 0.055, 0.072, 0.97)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.24, 0.34, 0.44, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="StyleBox_board"]
-bg_color = Color(0.043, 0.059, 0.081, 0.98)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.21, 0.31, 0.41, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="StyleBox_feedback"]
-bg_color = Color(0.055, 0.075, 0.102, 0.98)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.23, 0.76, 0.7, 0.9)
+border_color = Color(0.2, 0.37, 0.43, 1)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[sub_resource type="StyleBoxFlat" id="StyleBox_result"]
-bg_color = Color(0.075, 0.102, 0.14, 1)
+[sub_resource type="StyleBoxFlat" id="Style_turn"]
+bg_color = Color(0.047, 0.069, 0.088, 0.98)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.25, 0.4, 0.45, 1)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+
+[sub_resource type="StyleBoxFlat" id="Style_result"]
+bg_color = Color(0.059, 0.086, 0.114, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.3, 0.84, 0.75, 1)
+border_color = Color(0.26, 0.79, 0.72, 1)
 corner_radius_top_left = 12
 corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[node name="BattleScreen" type="Control" node_paths=PackedStringArray("grid_view", "highlight_view", "unit_view", "status_view", "objective_label", "phase_label", "turn_label", "round_label", "feedback_label", "result_overlay", "result_title_label", "result_detail_label", "result_restart_button")]
+[sub_resource type="StyleBoxFlat" id="Style_health_background"]
+bg_color = Color(0.055, 0.09, 0.08, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.16, 0.31, 0.25, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[sub_resource type="StyleBoxFlat" id="Style_health_fill"]
+bg_color = Color(0.22, 0.78, 0.44, 1)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="BattleScreen" type="Control" node_paths=PackedStringArray("board_view", "grid_view", "highlight_view", "unit_view", "status_view", "round_label", "result_overlay", "result_title_label", "result_detail_label", "result_restart_button")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -65,21 +74,18 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_controller")
-grid_view = NodePath("Content/ContentMargin/ContentRow/BoardPanel/BoardMargin/BoardViewport/BattleBoard/GridView")
-highlight_view = NodePath("Content/ContentMargin/ContentRow/BoardPanel/BoardMargin/BoardViewport/BattleBoard/HighlightView")
-unit_view = NodePath("Content/ContentMargin/ContentRow/BoardPanel/BoardMargin/BoardViewport/BattleBoard/UnitView")
-status_view = NodePath("Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent")
-objective_label = NodePath("Header/HeaderMargin/HeaderRow/TitleGroup/ObjectiveLabel")
-phase_label = NodePath("Header/HeaderMargin/HeaderRow/PhaseLabel")
-turn_label = NodePath("Header/HeaderMargin/HeaderRow/TurnLabel")
-round_label = NodePath("Header/HeaderMargin/HeaderRow/RoundLabel")
-feedback_label = NodePath("Footer/FooterMargin/FooterPanel/FeedbackLabel")
+board_view = NodePath("BoardArea/BoardFrame/BoardMargin/BattleBoardView")
+grid_view = NodePath("BoardArea/BoardFrame/BoardMargin/BattleBoardView/BattleBoard/GridView")
+highlight_view = NodePath("BoardArea/BoardFrame/BoardMargin/BattleBoardView/BattleBoard/HighlightView")
+unit_view = NodePath("BoardArea/BoardFrame/BoardMargin/BattleBoardView/BattleBoard/UnitView")
+status_view = NodePath("BattleHud")
+round_label = NodePath("BattleHud/TurnControl/TurnMargin/TurnContent/RoundLabel")
 result_overlay = NodePath("ResultOverlay")
 result_title_label = NodePath("ResultOverlay/ResultCenter/ResultPanel/ResultMargin/ResultContent/ResultTitleLabel")
 result_detail_label = NodePath("ResultOverlay/ResultCenter/ResultPanel/ResultMargin/ResultContent/ResultDetailLabel")
 result_restart_button = NodePath("ResultOverlay/ResultCenter/ResultPanel/ResultMargin/ResultContent/ResultRestartButton")
-encounter_definition = ExtResource("6_encounter")
-player_unit_definitions = Array[ExtResource("7_player")]([ExtResource("7_player"), ExtResource("7_player")])
+encounter_definition = ExtResource("4_encounter")
+player_unit_definitions = Array[ExtResource("5_player")]([ExtResource("5_player"), ExtResource("5_player")])
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -89,387 +95,266 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.025, 0.035, 0.049, 1)
+color = Color(0.014, 0.025, 0.035, 1)
 
-[node name="Header" type="MarginContainer" parent="."]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 96.0
-grow_horizontal = 2
-mouse_filter = 2
-
-[node name="HeaderMargin" type="MarginContainer" parent="Header"]
-layout_mode = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 20
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 10
-mouse_filter = 2
-
-[node name="HeaderRow" type="HBoxContainer" parent="Header/HeaderMargin"]
-layout_mode = 2
-theme_override_constants/separation = 24
-mouse_filter = 2
-
-[node name="TitleGroup" type="VBoxContainer" parent="Header/HeaderMargin/HeaderRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 3
-mouse_filter = 2
-
-[node name="TitleLabel" type="Label" parent="Header/HeaderMargin/HeaderRow/TitleGroup"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.94, 0.98, 1)
-theme_override_font_sizes/font_size = 28
-text = "Rogue Banner · 战术战斗"
-mouse_filter = 2
-
-[node name="ObjectiveLabel" type="Label" parent="Header/HeaderMargin/HeaderRow/TitleGroup"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.53, 0.65, 0.75, 1)
-theme_override_font_sizes/font_size = 14
-text = "准备战场……"
-mouse_filter = 2
-
-[node name="PhaseLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
-custom_minimum_size = Vector2(130, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "阶段：准备"
-vertical_alignment = 1
-mouse_filter = 2
-
-[node name="TurnLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
-custom_minimum_size = Vector2(110, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
-theme_override_font_sizes/font_size = 16
-text = "行动方：玩家"
-vertical_alignment = 1
-mouse_filter = 2
-
-[node name="RoundLabel" type="Label" parent="Header/HeaderMargin/HeaderRow"]
-custom_minimum_size = Vector2(90, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.9, 0.95, 1)
-theme_override_font_sizes/font_size = 16
-text = "轮次：0"
-vertical_alignment = 1
-mouse_filter = 2
-
-[node name="Content" type="MarginContainer" parent="."]
+[node name="BoardArea" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = 96.0
-offset_bottom = -84.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="ContentMargin" type="MarginContainer" parent="Content"]
+[node name="BoardFrame" type="PanelContainer" parent="BoardArea"]
 layout_mode = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 4
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 8
+theme_override_styles/panel = SubResource("Style_board")
 mouse_filter = 2
 
-[node name="ContentRow" type="HBoxContainer" parent="Content/ContentMargin"]
+[node name="BoardMargin" type="MarginContainer" parent="BoardArea/BoardFrame"]
 layout_mode = 2
-theme_override_constants/separation = 18
 mouse_filter = 2
 
-[node name="BoardPanel" type="PanelContainer" parent="Content/ContentMargin/ContentRow"]
-custom_minimum_size = Vector2(620, 440)
+[node name="BattleBoardView" parent="BoardArea/BoardFrame/BoardMargin" instance=ExtResource("3_board")]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_styles/panel = SubResource("StyleBox_board")
+
+[node name="BattleHud" type="Control" parent="." node_paths=PackedStringArray("deployment_panel", "deployment_progress_label", "deployment_next_unit_label", "start_battle_button", "reset_deployment_button", "unit_hud", "unit_portrait", "unit_name_label", "health_bar", "status_bar", "art_list", "ap_label", "art_detail_label", "turn_control", "end_turn_button")]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("2_status")
+deployment_panel = NodePath("DeploymentCenter/DeploymentPanel")
+deployment_progress_label = NodePath("DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent/DeploymentProgressLabel")
+deployment_next_unit_label = NodePath("DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent/DeploymentNextUnitLabel")
+start_battle_button = NodePath("DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow/StartBattleButton")
+reset_deployment_button = NodePath("DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow/ResetDeploymentButton")
+unit_hud = NodePath("SelectedUnitHud")
+unit_portrait = NodePath("SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitPortrait")
+unit_name_label = NodePath("SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText/UnitHeader/UnitNameLabel")
+health_bar = NodePath("SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText/HealthBar")
+status_bar = NodePath("SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText/UnitHeader/StatusBar")
+art_list = NodePath("SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection/ArtListScroll/ArtList")
+ap_label = NodePath("SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection/ActionFooter/ApLabel")
+art_detail_label = NodePath("SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection/ActionFooter/ArtDetailLabel")
+turn_control = NodePath("TurnControl")
+end_turn_button = NodePath("TurnControl/TurnMargin/TurnContent/EndTurnButton")
+
+[node name="DeploymentCenter" type="CenterContainer" parent="BattleHud"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 
-[node name="BoardMargin" type="MarginContainer" parent="Content/ContentMargin/ContentRow/BoardPanel"]
+[node name="DeploymentPanel" type="PanelContainer" parent="BattleHud/DeploymentCenter"]
+custom_minimum_size = Vector2(360, 196)
 layout_mode = 2
-theme_override_constants/margin_left = 18
+theme_override_styles/panel = SubResource("Style_hud")
+
+[node name="DeploymentMargin" type="MarginContainer" parent="BattleHud/DeploymentCenter/DeploymentPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 18
-theme_override_constants/margin_right = 18
-theme_override_constants/margin_bottom = 18
-mouse_filter = 2
-
-[node name="BoardViewport" type="Control" parent="Content/ContentMargin/ContentRow/BoardPanel/BoardMargin"]
-custom_minimum_size = Vector2(590, 424)
-layout_mode = 2
-size_flags_horizontal = 4
-size_flags_vertical = 4
-mouse_filter = 2
-clip_contents = true
-
-[node name="BattleBoard" type="Node2D" parent="Content/ContentMargin/ContentRow/BoardPanel/BoardMargin/BoardViewport"]
-position = Vector2(8, 7)
-
-[node name="GridView" type="Node2D" parent="Content/ContentMargin/ContentRow/BoardPanel/BoardMargin/BoardViewport/BattleBoard"]
-script = ExtResource("2_grid")
-
-[node name="HighlightView" type="Node2D" parent="Content/ContentMargin/ContentRow/BoardPanel/BoardMargin/BoardViewport/BattleBoard"]
-script = ExtResource("3_highlight")
-
-[node name="UnitView" type="Node2D" parent="Content/ContentMargin/ContentRow/BoardPanel/BoardMargin/BoardViewport/BattleBoard"]
-script = ExtResource("4_unit")
-
-[node name="SidePanel" type="PanelContainer" parent="Content/ContentMargin/ContentRow"]
-custom_minimum_size = Vector2(390, 440)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBox_panel")
-
-[node name="SideMargin" type="MarginContainer" parent="Content/ContentMargin/ContentRow/SidePanel"]
-layout_mode = 2
-theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 18
-theme_override_constants/margin_right = 20
+theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 18
 
-[node name="SideContent" type="VBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin" node_paths=PackedStringArray("deployment_panel", "deployment_progress_label", "deployment_next_unit_label", "start_battle_button", "reset_deployment_button", "battle_panel", "selected_unit_label", "status_effects_label", "art_selector", "art_detail_label", "use_art_button", "intent_label", "relic_label", "scroll_selector", "scroll_detail_label", "use_scroll_button", "end_turn_button", "restart_battle_button")]
+[node name="DeploymentContent" type="VBoxContainer" parent="BattleHud/DeploymentCenter/DeploymentPanel/DeploymentMargin"]
 layout_mode = 2
 theme_override_constants/separation = 12
-script = ExtResource("5_status")
-deployment_panel = NodePath("DeploymentPanel")
-deployment_progress_label = NodePath("DeploymentPanel/DeploymentProgressLabel")
-deployment_next_unit_label = NodePath("DeploymentPanel/DeploymentNextUnitLabel")
-start_battle_button = NodePath("DeploymentPanel/StartBattleButton")
-reset_deployment_button = NodePath("DeploymentPanel/ResetDeploymentButton")
-battle_panel = NodePath("BattlePanel")
-selected_unit_label = NodePath("BattlePanel/BattleScroll/BattleDetails/SelectedUnitLabel")
-status_effects_label = NodePath("BattlePanel/BattleScroll/BattleDetails/StatusEffectsLabel")
-art_selector = NodePath("BattlePanel/BattleScroll/BattleDetails/ArtSelector")
-art_detail_label = NodePath("BattlePanel/BattleScroll/BattleDetails/ArtDetailLabel")
-use_art_button = NodePath("BattlePanel/BattleScroll/BattleDetails/UseArtButton")
-intent_label = NodePath("BattlePanel/BattleScroll/BattleDetails/IntentLabel")
-relic_label = NodePath("BattlePanel/BattleScroll/BattleDetails/RelicLabel")
-scroll_selector = NodePath("BattlePanel/BattleScroll/BattleDetails/ScrollSelector")
-scroll_detail_label = NodePath("BattlePanel/BattleScroll/BattleDetails/ScrollDetailLabel")
-use_scroll_button = NodePath("BattlePanel/BattleScroll/BattleDetails/UseScrollButton")
-end_turn_button = NodePath("BattlePanel/BattleButtonRow/EndTurnButton")
-restart_battle_button = NodePath("BattlePanel/BattleButtonRow/RestartBattleButton")
 
-[node name="PanelTitle" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent"]
+[node name="DeploymentTitleLabel" type="Label" parent="BattleHud/DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
+theme_override_colors/font_color = Color(0.34, 0.86, 0.78, 1)
 theme_override_font_sizes/font_size = 21
-text = "战术面板"
-
-[node name="PanelDivider" type="HSeparator" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent"]
-layout_mode = 2
-
-[node name="DeploymentPanel" type="VBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 16
-
-[node name="DeploymentTitleLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/DeploymentPanel"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.94, 0.98, 1)
-theme_override_font_sizes/font_size = 18
 text = "战前部署"
+horizontal_alignment = 1
 
-[node name="DeploymentDescriptionLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/DeploymentPanel"]
+[node name="DeploymentProgressLabel" type="Label" parent="BattleHud/DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.68, 0.76, 0.84, 1)
-theme_override_font_sizes/font_size = 14
-text = "先观察地形和敌人位置，再把两名先锋放入蓝色部署区域。部署不会消耗行动点。"
-autowrap_mode = 2
-
-[node name="DeploymentProgressLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/DeploymentPanel"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.9, 0.94, 0.98, 1)
+theme_override_colors/font_color = Color(0.88, 0.93, 0.96, 1)
 theme_override_font_sizes/font_size = 16
-text = "部署进度：0 / 2"
+text = "已部署  0/2"
+horizontal_alignment = 1
 
-[node name="DeploymentNextUnitLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/DeploymentPanel"]
-custom_minimum_size = Vector2(0, 70)
+[node name="DeploymentNextUnitLabel" type="Label" parent="BattleHud/DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.75, 0.84, 0.91, 1)
-theme_override_font_sizes/font_size = 15
-text = "下一名单位：先锋\n点击蓝色部署格放置单位。"
-autowrap_mode = 2
+theme_override_colors/font_color = Color(0.67, 0.76, 0.82, 1)
+text = "选择蓝色格放置下一名单位"
+horizontal_alignment = 1
 
-[node name="DeploymentSpacer" type="Control" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/DeploymentPanel"]
+[node name="ButtonRow" type="HBoxContainer" parent="BattleHud/DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent"]
 layout_mode = 2
-size_flags_vertical = 3
-mouse_filter = 2
+theme_override_constants/separation = 8
 
-[node name="StartBattleButton" type="Button" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/DeploymentPanel"]
-custom_minimum_size = Vector2(0, 46)
+[node name="ResetDeploymentButton" type="Button" parent="BattleHud/DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
+size_flags_horizontal = 3
+text = "重新部署"
+
+[node name="StartBattleButton" type="Button" parent="BattleHud/DeploymentCenter/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
 disabled = true
 text = "开始战斗"
 
-[node name="ResetDeploymentButton" type="Button" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/DeploymentPanel"]
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "重新部署"
-
-[node name="BattlePanel" type="VBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent"]
+[node name="SelectedUnitHud" type="MarginContainer" parent="BattleHud"]
 visible = false
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 10
-
-[node name="BattleScroll" type="ScrollContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel"]
-layout_mode = 2
-size_flags_vertical = 3
-horizontal_scroll_mode = 0
-
-[node name="BattleDetails" type="VBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 11
-
-[node name="SelectedUnitTitle" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "当前单位"
-
-[node name="SelectedUnitLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-custom_minimum_size = Vector2(0, 72)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.88, 0.92, 0.96, 1)
-theme_override_font_sizes/font_size = 14
-text = "当前单位\n未选择"
-autowrap_mode = 2
-
-[node name="StatusEffectsLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.8, 0.9, 1)
-theme_override_font_sizes/font_size = 13
-text = "状态与被动\n未选择单位"
-autowrap_mode = 2
-
-[node name="ArtDivider" type="HSeparator" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-
-[node name="ArtTitleLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "技艺"
-
-[node name="ArtSelector" type="OptionButton" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-custom_minimum_size = Vector2(0, 38)
-layout_mode = 2
-disabled = true
-
-[node name="ArtDetailLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-custom_minimum_size = Vector2(0, 62)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.79, 0.87, 1)
-theme_override_font_sizes/font_size = 13
-text = "技艺：未选择"
-autowrap_mode = 2
-
-[node name="UseArtButton" type="Button" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-custom_minimum_size = Vector2(0, 42)
-layout_mode = 2
-disabled = true
-text = "选择技艺目标"
-
-[node name="IntentDivider" type="HSeparator" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-
-[node name="IntentTitleLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.95, 0.72, 0.32, 1)
-theme_override_font_sizes/font_size = 16
-text = "敌人意图"
-
-[node name="IntentLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.88, 0.92, 1)
-theme_override_font_sizes/font_size = 13
-text = "当前没有敌人意图。"
-autowrap_mode = 2
-
-[node name="RunItemDivider" type="HSeparator" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-
-[node name="RunItemTitleLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
-theme_override_font_sizes/font_size = 16
-text = "遗物与卷轴"
-
-[node name="RelicLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.76, 0.83, 0.9, 1)
-text = "遗物：无"
-autowrap_mode = 2
-
-[node name="ScrollSelector" type="OptionButton" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-custom_minimum_size = Vector2(0, 38)
-layout_mode = 2
-
-[node name="ScrollDetailLabel" type="Label" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.79, 0.87, 1)
-text = "卷轴：无"
-
-[node name="UseScrollButton" type="Button" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleScroll/BattleDetails"]
-custom_minimum_size = Vector2(0, 42)
-layout_mode = 2
-disabled = true
-text = "使用卷轴"
-
-[node name="BattleButtonRow" type="HBoxContainer" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="EndTurnButton" type="Button" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleButtonRow"]
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-size_flags_horizontal = 3
-text = "结束玩家回合"
-
-[node name="RestartBattleButton" type="Button" parent="Content/ContentMargin/ContentRow/SidePanel/SideMargin/SideContent/BattlePanel/BattleButtonRow"]
-custom_minimum_size = Vector2(96, 44)
-layout_mode = 2
-text = "重新开始"
-
-[node name="Footer" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_top = -84.0
+offset_left = 14.0
+offset_top = -106.0
+offset_right = -218.0
+offset_bottom = -8.0
 grow_horizontal = 2
 grow_vertical = 0
-mouse_filter = 2
 
-[node name="FooterMargin" type="MarginContainer" parent="Footer"]
+[node name="UnitHudMargin" type="MarginContainer" parent="BattleHud/SelectedUnitHud"]
 layout_mode = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 20
-mouse_filter = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
 
-[node name="FooterPanel" type="PanelContainer" parent="Footer/FooterMargin"]
+[node name="UnitHudRow" type="HBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin"]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBox_feedback")
-mouse_filter = 2
+theme_override_constants/separation = 16
 
-[node name="FeedbackLabel" type="Label" parent="Footer/FooterMargin/FooterPanel"]
-custom_minimum_size = Vector2(0, 48)
+[node name="IdentityGroup" type="HBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow"]
+custom_minimum_size = Vector2(270, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.78, 0.93, 0.9, 1)
-theme_override_font_sizes/font_size = 14
-text = "正在准备战斗……"
-horizontal_alignment = 1
+theme_override_constants/separation = 10
+
+[node name="UnitPortrait" type="TextureRect" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup"]
+custom_minimum_size = Vector2(76, 76)
+layout_mode = 2
+texture = ExtResource("6_portrait")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="UnitText" type="VBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="UnitHeader" type="HBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="UnitNameLabel" type="Label" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText/UnitHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.92, 0.96, 0.98, 1)
+theme_override_font_sizes/font_size = 18
+text = "单位"
 vertical_alignment = 1
-autowrap_mode = 2
-mouse_filter = 2
+text_overrun_behavior = 3
+
+[node name="StatusBar" type="HBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText/UnitHeader"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HealthBar" type="ProgressBar" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText"]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+theme_override_styles/background = SubResource("Style_health_background")
+theme_override_styles/fill = SubResource("Style_health_fill")
+show_percentage = false
+
+[node name="HealthHintLabel" type="Label" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/IdentityGroup/UnitText"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.42, 0.76, 0.56, 1)
+theme_override_font_sizes/font_size = 11
+text = "生命"
+
+[node name="ArtSection" type="VBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="ArtListScroll" type="ScrollContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection"]
+custom_minimum_size = Vector2(0, 62)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="ArtList" type="HBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection/ArtListScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="ActionFooter" type="HBoxContainer" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ApLabel" type="Label" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection/ActionFooter"]
+custom_minimum_size = Vector2(92, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 0.75, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "行动点  0/0"
+vertical_alignment = 1
+
+[node name="ArtDetailLabel" type="Label" parent="BattleHud/SelectedUnitHud/UnitHudMargin/UnitHudRow/ArtSection/ActionFooter"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.62, 0.71, 0.77, 1)
+theme_override_font_sizes/font_size = 11
+text = "选择技艺"
+vertical_alignment = 1
+text_overrun_behavior = 3
+
+[node name="TurnControl" type="PanelContainer" parent="BattleHud"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -208.0
+offset_top = -106.0
+offset_right = -12.0
+offset_bottom = -8.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("Style_turn")
+
+[node name="TurnMargin" type="MarginContainer" parent="BattleHud/TurnControl"]
+layout_mode = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 6
+theme_override_constants/margin_bottom = 6
+
+[node name="TurnContent" type="HBoxContainer" parent="BattleHud/TurnControl/TurnMargin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="RoundLabel" type="Label" parent="BattleHud/TurnControl/TurnMargin/TurnContent"]
+custom_minimum_size = Vector2(64, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.91, 0.73, 0.34, 1)
+theme_override_font_sizes/font_size = 15
+text = "回合  1"
+horizontal_alignment = 1
+
+[node name="EndTurnButton" type="Button" parent="BattleHud/TurnControl/TurnMargin/TurnContent"]
+custom_minimum_size = Vector2(112, 42)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "结束回合"
 
 [node name="ResultOverlay" type="ColorRect" parent="."]
 visible = false
@@ -480,7 +365,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0
-color = Color(0.01, 0.015, 0.022, 0.82)
+color = Color(0.008, 0.014, 0.02, 0.84)
 
 [node name="ResultCenter" type="CenterContainer" parent="ResultOverlay"]
 layout_mode = 1
@@ -491,37 +376,37 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="ResultPanel" type="PanelContainer" parent="ResultOverlay/ResultCenter"]
-custom_minimum_size = Vector2(460, 260)
+custom_minimum_size = Vector2(420, 238)
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBox_result")
+theme_override_styles/panel = SubResource("Style_result")
 
 [node name="ResultMargin" type="MarginContainer" parent="ResultOverlay/ResultCenter/ResultPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 34
-theme_override_constants/margin_top = 30
-theme_override_constants/margin_right = 34
-theme_override_constants/margin_bottom = 30
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 26
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 26
 
 [node name="ResultContent" type="VBoxContainer" parent="ResultOverlay/ResultCenter/ResultPanel/ResultMargin"]
 layout_mode = 2
-theme_override_constants/separation = 22
+theme_override_constants/separation = 18
 
 [node name="ResultTitleLabel" type="Label" parent="ResultOverlay/ResultCenter/ResultPanel/ResultMargin/ResultContent"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
-theme_override_font_sizes/font_size = 30
+theme_override_font_sizes/font_size = 28
 text = "战斗结果"
 horizontal_alignment = 1
 
 [node name="ResultDetailLabel" type="Label" parent="ResultOverlay/ResultCenter/ResultPanel/ResultMargin/ResultContent"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.86, 0.91, 0.96, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(0.84, 0.9, 0.94, 1)
+theme_override_font_sizes/font_size = 15
 text = "战斗已经结束。"
 horizontal_alignment = 1
 autowrap_mode = 2
 
 [node name="ResultRestartButton" type="Button" parent="ResultOverlay/ResultCenter/ResultPanel/ResultMargin/ResultContent"]
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "重新挑战"

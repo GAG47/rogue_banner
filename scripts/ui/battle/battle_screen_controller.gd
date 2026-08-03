@@ -8,17 +8,14 @@ signal external_battle_continue_requested
 const BATTLE_SEED: int = 20260802
 
 @export_category("Views")
+@export var board_view: BattleBoardView
 @export var grid_view: BattleScreenGridView
 @export var highlight_view: BattleScreenHighlightView
 @export var unit_view: BattleScreenUnitView
 @export var status_view: BattleScreenStatusView
 
-@export_category("Header")
-@export var objective_label: Label
-@export var phase_label: Label
-@export var turn_label: Label
+@export_category("Hud")
 @export var round_label: Label
-@export var feedback_label: Label
 
 @export_category("Result")
 @export var result_overlay: Control
@@ -80,8 +77,7 @@ func present_external_battle(battle: BattleState) -> bool:
 	).size()
 	_deployment_cells.clear()
 	_reset_interaction_state()
-	status_view.set_restart_available(false)
-	_set_feedback("战斗已载入。阅读敌人意图后提交行动。")
+	_set_feedback("战斗已载入。阅读敌人意图后提交行动。", false)
 	_refresh_view()
 	return true
 
@@ -90,26 +86,7 @@ func clear_external_battle() -> void:
 	_external_battle_mode = false
 	_battle = null
 	_reset_interaction_state()
-	status_view.set_restart_available(true)
 	_refresh_view()
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if _battle == null or grid_view == null:
-		return
-	if event is InputEventMouseMotion:
-		var motion: InputEventMouseMotion = event as InputEventMouseMotion
-		_update_hovered_coordinate(motion.position)
-		return
-	if event is InputEventMouseButton:
-		var button: InputEventMouseButton = event as InputEventMouseButton
-		if button.button_index == MOUSE_BUTTON_LEFT and button.pressed:
-			var coordinate: GridCoordinate = grid_view.screen_to_coordinate(
-				button.position
-			)
-			if coordinate != null:
-				request_cell_action(coordinate.value)
-				get_viewport().set_input_as_handled()
 
 
 func rebuild_battle() -> bool:
@@ -157,7 +134,7 @@ func rebuild_battle() -> bool:
 		if not placement.succeeded():
 			return _fail_rebuild("敌人配置无法放置到战场。")
 	_battle = battle
-	_set_feedback("点击蓝色部署格，依次放置我方单位。")
+	_set_feedback("点击蓝色部署格，依次放置我方单位。", false)
 	_refresh_view()
 	return true
 
@@ -374,10 +351,6 @@ func request_toggle_art_targeting() -> bool:
 	_refresh_targetable_cells()
 	if _targetable_cells.is_empty():
 		_set_feedback("已显示技艺射程，但当前没有合法落点。")
-	else:
-		_set_feedback(
-			"浅紫色是射程，亮紫色是合法落点；悬停可查看影响格。"
-		)
 	_refresh_view()
 	return true
 
@@ -431,7 +404,52 @@ func request_toggle_scroll_targeting() -> bool:
 		selection.targets_battle = true
 		_execute_scroll(selection)
 		return true
-	_set_feedback("已显示卷轴射程和合法落点。")
+	_refresh_view()
+	return true
+
+
+func request_use_scroll(stack_instance_id: int) -> bool:
+	if _battle == null or _selected_unit_id <= 0:
+		_set_feedback("请先选择使用卷轴的我方单位。")
+		return false
+	request_select_scroll(stack_instance_id)
+	return request_toggle_scroll_targeting()
+
+
+func request_discard_scroll(stack_instance_id: int) -> bool:
+	if _battle == null:
+		_set_feedback("战斗尚未准备完成。")
+		return false
+	var result: ActionExecutionResult = _action_service.execute(
+		_battle,
+		DiscardScrollActionRequest.create(stack_instance_id)
+	)
+	if not result.is_successful:
+		_set_feedback("无法丢弃卷轴：%s。" % (
+			BattleUiTextFormatter.failure_code_text(result.failure_code)
+		))
+		return false
+	_pending_scroll_stack_id = 0
+	_selected_scroll_stack_id = 0
+	_art_range_cells.clear()
+	_targetable_cells.clear()
+	_art_affected_cells.clear()
+	_refresh_reachable_cells()
+	_set_feedback("已经丢弃一张卷轴。")
+	_refresh_view()
+	return true
+
+
+func request_cancel_targeting() -> bool:
+	if _pending_art_slot_index < 0 and _pending_scroll_stack_id <= 0:
+		return false
+	_pending_art_slot_index = -1
+	_pending_scroll_stack_id = 0
+	_art_range_cells.clear()
+	_targetable_cells.clear()
+	_art_affected_cells.clear()
+	_refresh_reachable_cells()
+	_set_feedback("已取消目标选择，可以继续移动。")
 	_refresh_view()
 	return true
 
@@ -472,10 +490,6 @@ func get_read_model() -> BattleReadModel:
 
 func get_deployed_count() -> int:
 	return _deployed_count
-
-
-func get_feedback_text() -> String:
-	return feedback_label.text if feedback_label != null else ""
 
 
 func get_selected_unit_id() -> int:
@@ -617,10 +631,7 @@ func _refresh_targetable_cells() -> void:
 	)
 
 
-func _update_hovered_coordinate(screen_position: Vector2) -> void:
-	var next_coordinate: GridCoordinate = grid_view.screen_to_coordinate(
-		screen_position
-	)
+func _on_board_cell_hovered(next_coordinate: GridCoordinate) -> void:
 	if _coordinates_match(_hovered_coordinate, next_coordinate):
 		return
 	_hovered_coordinate = next_coordinate
@@ -658,56 +669,33 @@ func _refresh_art_affected_cells() -> void:
 
 func _refresh_view() -> void:
 	_read_model = _read_model_service.build(_battle)
-	if (
-		_selected_scroll_stack_id <= 0
-		and _read_model != null
-		and not _read_model.scrolls.is_empty()
-	):
-		_selected_scroll_stack_id = _read_model.scrolls[0].stack_instance_id
-	if grid_view != null:
-		grid_view.present(_read_model)
-	if unit_view != null:
-		unit_view.present(_read_model)
+	if board_view != null:
+		board_view.present_battle(_read_model)
 	if status_view != null:
 		_selected_art_slot_index = status_view.present(
 			_read_model,
 			_inspected_unit_id,
 			_selected_art_slot_index,
 			_pending_art_slot_index,
-			_selected_scroll_stack_id,
-			_pending_scroll_stack_id,
 			_deployed_count,
 			player_unit_definitions.size(),
 			_next_deployment_name()
 		)
-	_refresh_header()
+	_refresh_turn_control()
 	_refresh_highlights()
 	_refresh_result()
 	battle_read_model_changed.emit(_read_model)
 
 
-func _refresh_header() -> void:
+func _refresh_turn_control() -> void:
 	if _read_model == null:
-		phase_label.text = "阶段：不可用"
-		turn_label.text = "行动方：--"
-		round_label.text = "轮次：--"
+		round_label.text = "回合  --"
 		return
-	phase_label.text = "阶段：%s" % BattleUiTextFormatter.phase_text(
-		_read_model.phase
-	)
-	turn_label.text = "行动方：%s" % BattleUiTextFormatter.side_text(
-		_read_model.active_side
-	)
-	round_label.text = "轮次：%d" % _read_model.round_number
-	objective_label.text = (
-		"在蓝色区域部署两名先锋，然后阅读敌人意图并击败全部敌人。"
-		if _read_model.phase == GameEnums.BattlePhase.SETUP
-		else "红色格为敌方危险区，橙色格为计划移动路线。"
-	)
+	round_label.text = "回合  %d" % _read_model.round_number
 
 
 func _refresh_highlights() -> void:
-	if highlight_view == null:
+	if board_view == null:
 		return
 	var selected_coordinate: GridCoordinate
 	if _read_model != null and _inspected_unit_id > 0:
@@ -730,10 +718,8 @@ func _refresh_highlights() -> void:
 				intent_danger_cells[coordinate] = true
 			for coordinate: Vector2i in intent.movement_path:
 				intent_move_cells[coordinate] = true
-	highlight_view.present(
+	board_view.present_highlights(
 		selected_coordinate,
-		_hovered_coordinate,
-		shown_deployment_cells,
 		_reachable_cells,
 		_art_range_cells,
 		_targetable_cells,
@@ -741,6 +727,18 @@ func _refresh_highlights() -> void:
 		intent_danger_cells,
 		intent_move_cells
 	)
+	if _read_model != null and _read_model.phase == GameEnums.BattlePhase.SETUP:
+		highlight_view.present(
+			selected_coordinate,
+			_hovered_coordinate,
+			shown_deployment_cells,
+			_reachable_cells,
+			_art_range_cells,
+			_targetable_cells,
+			_art_affected_cells,
+			intent_danger_cells,
+			intent_move_cells
+		)
 
 
 func _refresh_result() -> void:
@@ -760,11 +758,19 @@ func _refresh_result() -> void:
 	result_restart_button.text = (
 		"继续" if _external_battle_mode else "重新挑战"
 	)
-	if status_view != null:
-		status_view.set_restart_available(not _external_battle_mode)
 
 
 func _connect_interface() -> void:
+	if not board_view.cell_pressed.is_connected(request_cell_action):
+		board_view.cell_pressed.connect(request_cell_action)
+	if not board_view.cell_hovered.is_connected(_on_board_cell_hovered):
+		board_view.cell_hovered.connect(_on_board_cell_hovered)
+	if not board_view.targeting_cancel_requested.is_connected(
+		request_cancel_targeting
+	):
+		board_view.targeting_cancel_requested.connect(
+			request_cancel_targeting
+		)
 	if not status_view.deployment_start_requested.is_connected(
 		request_start_battle
 	):
@@ -781,20 +787,8 @@ func _connect_interface() -> void:
 		request_toggle_art_targeting
 	):
 		status_view.art_use_requested.connect(request_toggle_art_targeting)
-	if not status_view.scroll_selected.is_connected(request_select_scroll):
-		status_view.scroll_selected.connect(request_select_scroll)
-	if not status_view.scroll_use_requested.is_connected(
-		request_toggle_scroll_targeting
-	):
-		status_view.scroll_use_requested.connect(
-			request_toggle_scroll_targeting
-		)
 	if not status_view.end_turn_requested.is_connected(request_end_turn):
 		status_view.end_turn_requested.connect(request_end_turn)
-	if not status_view.battle_restart_requested.is_connected(
-		request_restart_battle
-	):
-		status_view.battle_restart_requested.connect(request_restart_battle)
 	if not result_restart_button.pressed.is_connected(
 		_on_result_action_pressed
 	):
@@ -824,15 +818,12 @@ func _reset_interaction_state() -> void:
 
 func _has_complete_configuration() -> bool:
 	if (
-		grid_view == null
+		board_view == null
+		or grid_view == null
 		or highlight_view == null
 		or unit_view == null
 		or status_view == null
-		or objective_label == null
-		or phase_label == null
-		or turn_label == null
 		or round_label == null
-		or feedback_label == null
 		or result_overlay == null
 		or result_title_label == null
 		or result_detail_label == null
@@ -890,7 +881,5 @@ func _fail_rebuild(message: String) -> bool:
 	return false
 
 
-func _set_feedback(message: String) -> void:
-	if feedback_label != null:
-		feedback_label.text = message
+func _set_feedback(message: String, _show_toast: bool = true) -> void:
 	feedback_changed.emit(message)

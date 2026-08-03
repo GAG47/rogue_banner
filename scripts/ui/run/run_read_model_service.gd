@@ -107,6 +107,12 @@ func _build_inventory(run: RunState) -> InventoryReadModel:
 		scroll.display_name = source_scroll.definition.display_name
 		scroll.quantity = source_scroll.quantity
 		scroll.maximum_stack_size = source_scroll.definition.max_stack_size
+		scroll.effect_summary = ScrollUiTextFormatter.effect_summary(
+			source_scroll.definition
+		)
+		if source_scroll.definition.targeting != null:
+			scroll.minimum_range = source_scroll.definition.targeting.minimum_range
+			scroll.maximum_range = source_scroll.definition.targeting.maximum_range
 		model.scrolls.append(scroll)
 	return model
 
@@ -197,6 +203,7 @@ func _build_deployment(
 		return null
 	var battlefield: BattlefieldDefinition = encounter.battlefield
 	var model: DeploymentReadModel = DeploymentReadModel.new()
+	model.encounter_instance_id = node.instance_id
 	model.encounter_name = encounter.display_name
 	model.node_kind = node.definition.kind
 	model.width = battlefield.width

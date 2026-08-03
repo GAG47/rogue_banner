@@ -161,6 +161,9 @@ func _build_run_items(battle: BattleState, model: BattleReadModel) -> void:
 		scroll.stack_instance_id = source_scroll.instance_id
 		scroll.display_name = source_scroll.definition.display_name
 		scroll.quantity = source_scroll.quantity
+		scroll.effect_summary = ScrollUiTextFormatter.effect_summary(
+			source_scroll.definition
+		)
 		if source_scroll.definition.targeting != null:
 			scroll.target_kind = source_scroll.definition.targeting.target_kind
 			scroll.minimum_range = source_scroll.definition.targeting.minimum_range

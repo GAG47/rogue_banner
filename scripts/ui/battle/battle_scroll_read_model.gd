@@ -7,4 +7,4 @@ var quantity: int = 0
 var target_kind: GameEnums.TargetKind = GameEnums.TargetKind.CELL
 var minimum_range: int = 0
 var maximum_range: int = 0
-
+var effect_summary: String = ""

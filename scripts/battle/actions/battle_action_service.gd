@@ -71,6 +71,11 @@ func validate(
 				battle,
 				request as UseScrollActionRequest
 		)
+	if request is DiscardScrollActionRequest:
+		return _validate_discard_scroll(
+			battle,
+			request as DiscardScrollActionRequest
+		)
 	if request is EndTurnActionRequest:
 		return _validate_end_turn(battle, request as EndTurnActionRequest)
 	return ActionValidationResult.rejected(
@@ -121,6 +126,11 @@ func execute(
 				transaction.working_state,
 				request as UseScrollActionRequest,
 				working_validation.plan
+		)
+	elif request is DiscardScrollActionRequest:
+		result = _execute_discard_scroll(
+			transaction.working_state,
+			request as DiscardScrollActionRequest
 		)
 	else:
 		return ActionExecutionResult.failure(
@@ -420,6 +430,36 @@ func _validate_use_scroll(
 	return ActionValidationResult.accepted(plan)
 
 
+func _validate_discard_scroll(
+	battle: BattleState,
+	request: DiscardScrollActionRequest
+) -> ActionValidationResult:
+	if request.requesting_side != GameEnums.BattleSide.PLAYER:
+		return ActionValidationResult.rejected(
+			GameEnums.ActionFailureCode.SCROLL_NOT_USABLE
+		)
+	var phase_failure: GameEnums.ActionFailureCode = _validate_active_side(
+		battle,
+		request.requesting_side
+	)
+	if phase_failure != GameEnums.ActionFailureCode.NONE:
+		return ActionValidationResult.rejected(phase_failure)
+	var stack: BattleScrollStackState = battle.get_scroll(
+		request.scroll_stack_instance_id
+	)
+	if stack == null or stack.definition == null:
+		return ActionValidationResult.rejected(
+			GameEnums.ActionFailureCode.SCROLL_NOT_FOUND
+		)
+	if stack.quantity <= 0:
+		return ActionValidationResult.rejected(
+			GameEnums.ActionFailureCode.SCROLL_EMPTY
+		)
+	return ActionValidationResult.accepted(
+		ActionExecutionPlan.create(request)
+	)
+
+
 func _validate_end_turn(
 		battle: BattleState,
 		request: EndTurnActionRequest
@@ -586,6 +626,23 @@ func _execute_use_scroll(
 	if result.is_successful:
 		result.scroll_stack_instance_id = stack.instance_id
 		result.scrolls_consumed = 1
+	return result
+
+
+func _execute_discard_scroll(
+	battle: BattleState,
+	request: DiscardScrollActionRequest
+) -> ActionExecutionResult:
+	var stack: BattleScrollStackState = battle.get_scroll(
+		request.scroll_stack_instance_id
+	)
+	if stack == null or not stack.consume_one():
+		return ActionExecutionResult.failure(
+			GameEnums.ActionFailureCode.STATE_CHANGED
+		)
+	var result: ActionExecutionResult = ActionExecutionResult.success(battle)
+	result.scroll_stack_instance_id = stack.instance_id
+	result.scrolls_discarded = 1
 	return result
 
 

@@ -1,6 +1,7 @@
 class_name DeploymentReadModel
 extends RefCounted
 
+var encounter_instance_id: int = 0
 var encounter_name: String = ""
 var node_kind: GameEnums.MapNodeKind = GameEnums.MapNodeKind.BATTLE
 var width: int = 0

@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/run/run_screen_controller.gd" id="1_controller"]
 [ext_resource type="Script" path="res://scripts/ui/run/run_header_view.gd" id="2_header"]
@@ -14,6 +14,7 @@
 [ext_resource type="Resource" path="res://content/scrolls/debug_blast_scroll.tres" id="12_scroll"]
 [ext_resource type="Script" path="res://scripts/ui/run/map_route_graph_view.gd" id="13_map_graph"]
 [ext_resource type="Script" path="res://scripts/ui/run/settings_overlay_view.gd" id="14_settings"]
+[ext_resource type="PackedScene" path="res://scenes/battle/battle_board.tscn" id="15_battle_board"]
 
 [sub_resource type="StyleBoxFlat" id="Style_panel"]
 bg_color = Color(0.065, 0.09, 0.125, 0.98)
@@ -44,18 +45,6 @@ bg_color = Color(0.04, 0.06, 0.085, 0.98)
 border_width_top = 1
 border_color = Color(0.23, 0.76, 0.7, 0.7)
 
-[sub_resource type="StyleBoxFlat" id="Style_toast"]
-bg_color = Color(0.055, 0.075, 0.095, 0.96)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.85, 0.48, 0.35, 0.9)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
 [sub_resource type="StyleBoxFlat" id="Style_overlay"]
 bg_color = Color(0.075, 0.105, 0.145, 1)
 border_width_left = 2
@@ -68,7 +57,20 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[node name="RunScreen" type="Control" node_paths=PackedStringArray("shell_header", "shell_content", "header_view", "map_panel", "deployment_panel", "battle_host", "battle_screen", "reward_panel", "event_panel", "result_panel", "inventory_overlay", "settings_overlay", "feedback_toast", "feedback_label", "feedback_timer")]
+[sub_resource type="StyleBoxFlat" id="Style_scroll_detail"]
+bg_color = Color(0.047, 0.071, 0.094, 0.99)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.29, 0.48, 0.55, 1)
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+shadow_color = Color(0, 0, 0, 0.4)
+shadow_size = 5
+
+[node name="RunScreen" type="Control" node_paths=PackedStringArray("shell_header", "shell_content", "header_view", "map_panel", "deployment_panel", "battle_host", "battle_screen", "reward_panel", "event_panel", "result_panel", "inventory_overlay", "settings_overlay")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -88,9 +90,6 @@ event_panel = NodePath("Content/ContentMargin/EventPanel")
 result_panel = NodePath("Content/ContentMargin/RunResultPanel")
 inventory_overlay = NodePath("InventoryOverlay")
 settings_overlay = NodePath("SettingsOverlay")
-feedback_toast = NodePath("FeedbackToast")
-feedback_label = NodePath("FeedbackToast/FeedbackLabel")
-feedback_timer = NodePath("FeedbackTimer")
 hero_definition = ExtResource("10_hero")
 map_definition = ExtResource("11_map")
 starting_scrolls = Array[ExtResource("12_scroll")]([ExtResource("12_scroll")])
@@ -120,7 +119,7 @@ theme_override_constants/margin_top = 7
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 7
 
-[node name="HeaderRow" type="HBoxContainer" parent="Header/HeaderMargin" node_paths=PackedStringArray("hero_portrait", "gold_label", "scroll_slot_row", "map_button", "build_button", "settings_button")]
+[node name="HeaderRow" type="HBoxContainer" parent="Header/HeaderMargin" node_paths=PackedStringArray("hero_portrait", "gold_label", "scroll_slot_row", "map_button", "build_button", "settings_button", "scroll_detail_popup", "scroll_detail_name_label", "scroll_detail_effect_label", "scroll_detail_meta_label", "scroll_action_popup", "scroll_use_button", "scroll_discard_button")]
 layout_mode = 2
 theme_override_constants/separation = 12
 script = ExtResource("2_header")
@@ -130,6 +129,13 @@ scroll_slot_row = NodePath("ScrollSlotRow")
 map_button = NodePath("MapButton")
 build_button = NodePath("BuildButton")
 settings_button = NodePath("SettingsButton")
+scroll_detail_popup = NodePath("../../../ScrollDetailPopup")
+scroll_detail_name_label = NodePath("../../../ScrollDetailPopup/ScrollDetailMargin/ScrollDetailContent/ScrollDetailNameLabel")
+scroll_detail_effect_label = NodePath("../../../ScrollDetailPopup/ScrollDetailMargin/ScrollDetailContent/ScrollDetailEffectLabel")
+scroll_detail_meta_label = NodePath("../../../ScrollDetailPopup/ScrollDetailMargin/ScrollDetailContent/ScrollDetailMetaLabel")
+scroll_action_popup = NodePath("../../../ScrollActionPopup")
+scroll_use_button = NodePath("../../../ScrollActionPopup/ScrollActionMargin/ScrollActionButtonRow/ScrollUseButton")
+scroll_discard_button = NodePath("../../../ScrollActionPopup/ScrollActionMargin/ScrollActionButtonRow/ScrollDiscardButton")
 
 [node name="HeroPortrait" type="TextureRect" parent="Header/HeaderMargin/HeaderRow"]
 custom_minimum_size = Vector2(48, 48)
@@ -223,63 +229,87 @@ size_flags_horizontal = 3
 mouse_filter = 2
 script = ExtResource("13_map_graph")
 
-[node name="DeploymentPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("encounter_label", "unit_selector", "deployment_grid", "deployed_unit_list", "start_battle_button", "reset_button")]
+[node name="DeploymentPanel" type="PanelContainer" parent="Content/ContentMargin" node_paths=PackedStringArray("encounter_label", "deployment_count_label", "board_view", "unit_roster", "start_battle_button", "reset_button")]
 visible = false
 layout_mode = 2
 theme_override_styles/panel = SubResource("Style_panel")
 script = ExtResource("4_deployment")
-encounter_label = NodePath("DeploymentMargin/DeploymentContent/EncounterLabel")
-unit_selector = NodePath("DeploymentMargin/DeploymentContent/UnitSelector")
-deployment_grid = NodePath("DeploymentMargin/DeploymentContent/DeploymentGrid")
-deployed_unit_list = NodePath("DeploymentMargin/DeploymentContent/DeployedUnitList")
-start_battle_button = NodePath("DeploymentMargin/DeploymentContent/ButtonRow/StartBattleButton")
-reset_button = NodePath("DeploymentMargin/DeploymentContent/ButtonRow/ResetButton")
+encounter_label = NodePath("DeploymentMargin/DeploymentContent/DeploymentHeader/EncounterLabel")
+deployment_count_label = NodePath("DeploymentMargin/DeploymentContent/DeploymentHeader/DeploymentCountLabel")
+board_view = NodePath("DeploymentMargin/DeploymentContent/BoardCenter/DeploymentBoard")
+unit_roster = NodePath("DeploymentMargin/DeploymentContent/UnitRosterScroll/UnitRoster")
+start_battle_button = NodePath("DeploymentMargin/DeploymentContent/DeploymentHeader/StartBattleButton")
+reset_button = NodePath("DeploymentMargin/DeploymentContent/DeploymentHeader/ResetButton")
 
 [node name="DeploymentMargin" type="MarginContainer" parent="Content/ContentMargin/DeploymentPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 22
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 22
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 14
 
 [node name="DeploymentContent" type="VBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
-[node name="EncounterLabel" type="Label" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+[node name="DeploymentHeader" type="HBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="EncounterLabel" type="Label" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/DeploymentHeader"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.3, 0.84, 0.75, 1)
 theme_override_font_sizes/font_size = 24
 text = "战前部署"
+vertical_alignment = 1
 
-[node name="UnitSelector" type="OptionButton" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
-custom_minimum_size = Vector2(0, 42)
-layout_mode = 2
-
-[node name="DeploymentGrid" type="GridContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/h_separation = 5
-theme_override_constants/v_separation = 5
-columns = 7
-
-[node name="DeployedUnitList" type="VBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
-layout_mode = 2
-
-[node name="ButtonRow" type="HBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="StartBattleButton" type="Button" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow"]
-custom_minimum_size = Vector2(0, 46)
+[node name="HeaderSpacer" type="Control" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/DeploymentHeader"]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "开始战斗"
 
-[node name="ResetButton" type="Button" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/ButtonRow"]
-custom_minimum_size = Vector2(130, 46)
+[node name="DeploymentCountLabel" type="Label" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/DeploymentHeader"]
+custom_minimum_size = Vector2(126, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.76, 0.88, 0.91, 1)
+theme_override_font_sizes/font_size = 18
+text = "已部署  0/0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ResetButton" type="Button" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/DeploymentHeader"]
+custom_minimum_size = Vector2(116, 44)
 layout_mode = 2
 text = "清空部署"
+
+[node name="StartBattleButton" type="Button" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/DeploymentHeader"]
+custom_minimum_size = Vector2(150, 44)
+layout_mode = 2
+text = "开始战斗"
+
+[node name="BoardCenter" type="CenterContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="DeploymentBoard" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/BoardCenter" instance=ExtResource("15_battle_board")]
+custom_minimum_size = Vector2(720, 330)
+layout_mode = 2
+
+[node name="RosterLabel" type="Label" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.73, 0.84, 0.88, 1)
+theme_override_font_sizes/font_size = 18
+text = "选择参战单位"
+
+[node name="UnitRosterScroll" type="ScrollContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent"]
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+horizontal_scroll_mode = 1
+vertical_scroll_mode = 0
+
+[node name="UnitRoster" type="HBoxContainer" parent="Content/ContentMargin/DeploymentPanel/DeploymentMargin/DeploymentContent/UnitRosterScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
 
 [node name="BattleHost" type="Control" parent="Content"]
 visible = false
@@ -289,6 +319,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
 [node name="BattleScreen" parent="Content/BattleHost" instance=ExtResource("5_battle")]
 layout_mode = 1
@@ -463,31 +494,83 @@ custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "开始新远征"
 
-[node name="FeedbackToast" type="PanelContainer" parent="."]
+[node name="ScrollDetailPopup" type="PanelContainer" parent="."]
 visible = false
-layout_mode = 1
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -280.0
-offset_top = -72.0
-offset_right = 280.0
-offset_bottom = -20.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_styles/panel = SubResource("Style_toast")
+z_index = 20
+custom_minimum_size = Vector2(268, 0)
+layout_mode = 0
+offset_left = 190.0
+offset_top = 58.0
+offset_right = 458.0
+offset_bottom = 138.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("Style_scroll_detail")
 
-[node name="FeedbackLabel" type="Label" parent="FeedbackToast"]
+[node name="ScrollDetailMargin" type="MarginContainer" parent="ScrollDetailPopup"]
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.86, 0.78, 1)
-text = "操作失败。"
-horizontal_alignment = 1
-vertical_alignment = 1
+theme_override_constants/margin_left = 11
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 11
+theme_override_constants/margin_bottom = 8
 
-[node name="FeedbackTimer" type="Timer" parent="."]
-wait_time = 3.0
-one_shot = true
+[node name="ScrollDetailContent" type="VBoxContainer" parent="ScrollDetailPopup/ScrollDetailMargin"]
+layout_mode = 2
+theme_override_constants/separation = 3
+
+[node name="ScrollDetailNameLabel" type="Label" parent="ScrollDetailPopup/ScrollDetailMargin/ScrollDetailContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.78, 0.29, 1)
+theme_override_font_sizes/font_size = 16
+text = "卷轴"
+
+[node name="ScrollDetailEffectLabel" type="Label" parent="ScrollDetailPopup/ScrollDetailMargin/ScrollDetailContent"]
+custom_minimum_size = Vector2(246, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.84, 0.9, 0.91, 1)
+theme_override_font_sizes/font_size = 13
+text = "卷轴效果"
+autowrap_mode = 2
+
+[node name="ScrollDetailMetaLabel" type="Label" parent="ScrollDetailPopup/ScrollDetailMargin/ScrollDetailContent"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.54, 0.67, 0.72, 1)
+theme_override_font_sizes/font_size = 11
+text = "数量 1　射程 1—5"
+
+[node name="ScrollActionPopup" type="PanelContainer" parent="."]
+visible = false
+z_index = 21
+custom_minimum_size = Vector2(156, 46)
+layout_mode = 0
+offset_left = 190.0
+offset_top = 58.0
+offset_right = 346.0
+offset_bottom = 104.0
+mouse_filter = 0
+theme_override_styles/panel = SubResource("Style_overlay")
+
+[node name="ScrollActionMargin" type="MarginContainer" parent="ScrollActionPopup"]
+layout_mode = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="ScrollActionButtonRow" type="HBoxContainer" parent="ScrollActionPopup/ScrollActionMargin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="ScrollUseButton" type="Button" parent="ScrollActionPopup/ScrollActionMargin/ScrollActionButtonRow"]
+custom_minimum_size = Vector2(72, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "使用"
+
+[node name="ScrollDiscardButton" type="Button" parent="ScrollActionPopup/ScrollActionMargin/ScrollActionButtonRow"]
+custom_minimum_size = Vector2(72, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "丢弃"
 
 [node name="InventoryOverlay" type="ColorRect" parent="." node_paths=PackedStringArray("summary_label", "relic_label", "unit_selector", "art_selector", "slot_selector", "scroll_selector", "install_button", "uninstall_button", "upgrade_button", "forget_button", "discard_scroll_button", "close_button")]
 visible = false

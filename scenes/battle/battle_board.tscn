@@ -1,0 +1,33 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/battle/battle_board_view.gd" id="1_board"]
+[ext_resource type="Script" path="res://scripts/ui/battle/battle_grid_view.gd" id="2_grid"]
+[ext_resource type="Script" path="res://scripts/ui/battle/battle_highlight_view.gd" id="3_highlight"]
+[ext_resource type="Script" path="res://scripts/ui/battle/battle_unit_view.gd" id="4_unit"]
+
+[node name="BattleBoardView" type="Control" node_paths=PackedStringArray("battle_board", "grid_view", "highlight_view", "unit_view")]
+custom_minimum_size = Vector2(640, 360)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+clip_contents = true
+script = ExtResource("1_board")
+battle_board = NodePath("BattleBoard")
+grid_view = NodePath("BattleBoard/GridView")
+highlight_view = NodePath("BattleBoard/HighlightView")
+unit_view = NodePath("BattleBoard/UnitView")
+
+[node name="BattleBoard" type="Node2D" parent="."]
+
+[node name="GridView" type="Node2D" parent="BattleBoard"]
+script = ExtResource("2_grid")
+
+[node name="HighlightView" type="Node2D" parent="BattleBoard"]
+script = ExtResource("3_highlight")
+
+[node name="UnitView" type="Node2D" parent="BattleBoard"]
+script = ExtResource("4_unit")
